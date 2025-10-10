@@ -1,0 +1,100 @@
+import sys
+import cv2
+import mediapipe 
+import numpy as np
+from video_utility import mov_to_mp4
+from angle_calculations import calculate_angle
+from exercise_analysis import analyse_squat
+# analyse_pushup, analyse_lunge, analyse_plank
+
+def analyse_video(video_path, exercise_type):
+    """
+    Supported: squat, pushup, lunge, plank
+    Exercise selected by user -> parsed to backend + called by django
+    """
+    
+    if exercise_type not in ["squat", "pushup", "lunge", "plank"]:
+        print(f"Exercise '{exercise_type}' not supported yet")
+        return
+    
+    video_path = mov_to_mp4(video_path) # mov(iphone format) -> mp4 
+
+    mp_pose = mediapipe.solutions.pose
+    mp_drawing = mediapipe.solutions.drawing_utils
+    
+    # opencv reads a video from a file
+    cap = cv2.VideoCapture(video_path)
+    # if not cap.isOpened():
+    #     print(f"Failed to open video file: {video_path}")
+    #     return
+    # else:
+    #     print(f"Opened video: {video_path}")
+
+    # record fps, dimensions of input video 
+    fps = int(cap.get(cv2.CAP_PROP_FPS))
+    width  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    
+    #writer output logic
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    out = cv2.VideoWriter('exercise_output.mp4', fourcc, fps, (width, height))
+    
+    pose = mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) # test other value mb better accuracy
+
+    while cap.isOpened():
+        ret, frame = cap.read()
+        print("Reading frames")
+
+        if not ret:
+            # print("Failed to read frame or end")
+            break
+
+        #rgb for mediapipe 
+        image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        results = pose.process(image_rgb)
+
+        # drawing points of interest (joints)
+        if results.pose_landmarks:
+            mp_drawing.draw_landmarks(
+                frame,
+                results.pose_landmarks,
+                mp_pose.POSE_CONNECTIONS,
+                mp_drawing.DrawingSpec(color=(255, 255, 255), thickness=2, circle_radius=3),
+                mp_drawing.DrawingSpec(color=(0, 0, 255), thickness=2, circle_radius=3)
+            )
+
+            landmarks = results.pose_landmarks.landmark
+            
+            # call the appropriate exercise type analyser 
+            if exercise_type == "squat":
+                angle, feedback, color, label = analyse_squat(landmarks, mp_pose)
+            elif exercise_type == "pushup":
+                angle, feedback, color, label = analyse_pushup(landmarks, mp_pose)
+            elif exercise_type == "lunge":
+                angle, feedback, color, label = analyse_lunge(landmarks, mp_pose)
+            elif exercise_type == "plank":
+                angle, feedback, color, label = analyse_plank(landmarks, mp_pose)
+
+            # Display angle and feedback
+            cv2.putText(frame, f"{label}: {int(angle)}", (30, 50),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
+            cv2.putText(frame, feedback, (30, 100),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1.2, color, 3)
+
+        # write output video to a separate file (later send to django api -> DB)
+        out.write(frame)
+
+    cap.release()
+    out.release()
+    cv2.destroyAllWindows()
+
+    
+#entry point   
+if __name__ == "__main__":
+    if len(sys.argv) > 2:
+        video_file = sys.argv[1]
+        exercise = sys.argv[2]
+        analyse_video(video_file, exercise)
+    else:
+        # defaults to sqaut
+        analyse_video("test_squat.mov", "squat")
