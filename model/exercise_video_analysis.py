@@ -45,9 +45,10 @@ def analyse_video(video_path, exercise_type):
         ret, frame = cap.read()
         print("Reading frames")
 
+        # if end of video or no frame
         if not ret:
-            # print("Failed to read frame or end")
-            break
+        #     # print("Failed to read frame or end")
+         break
 
         #rgb for mediapipe 
         image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -67,7 +68,8 @@ def analyse_video(video_path, exercise_type):
             
             # call the appropriate exercise type analyser 
             if exercise_type == "squat":
-                angle, feedback, color, label = analyse_squat(landmarks, mp_pose)
+                summary, angle, feedback, color, label, side = analyse_squat(landmarks, mp_pose)
+                # print(summary)
             elif exercise_type == "pushup":
                 angle, feedback, color, label = analyse_pushup(landmarks, mp_pose)
             elif exercise_type == "lunge":
@@ -76,10 +78,14 @@ def analyse_video(video_path, exercise_type):
                 angle, feedback, color, label = analyse_plank(landmarks, mp_pose)
 
             # Display angle and feedback
-            cv2.putText(frame, f"{label}: {int(angle)}", (30, 50),
+            cv2.putText(frame, f"{summary}", (30, 300),
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
-            cv2.putText(frame, feedback, (30, 100),
+            cv2.putText(frame, f"{label}: {int(angle)}", (30, 70),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
+            cv2.putText(frame, feedback, (30, 120),
                         cv2.FONT_HERSHEY_SIMPLEX, 1.2, color, 3)
+            cv2.putText(frame, f"{side}", (30, 30),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
 
         # write output video to a separate file (later send to django api -> DB)
         out.write(frame)

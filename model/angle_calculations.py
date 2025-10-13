@@ -1,5 +1,5 @@
 """
-Calulation of angles between joints(generic for ANY exercise)
+Calulation of angles between joints(ANY exercise)
 """
 
 import numpy as np

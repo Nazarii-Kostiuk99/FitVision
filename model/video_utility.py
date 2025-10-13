@@ -3,7 +3,7 @@ import os
 
 """
     Utiity function to convert a video .mov to .mp4.
-    If already .mp4, returns input_path.
+    If alrdy .mp4 -> input_path.
 """
 def mov_to_mp4(input_video_path):
     if input_video_path.lower().endswith('.mp4'):
