@@ -63,6 +63,7 @@ def analyse_squat(landmarks, mp_pose):
     trunk_angle = calculate_angle(shoulder, hip, hip_vertical)# trunk inclination - deviation from vertical
     shin_angle = calculate_angle(knee, ankle, knee_vertical) #shin inclination - shin angle from vertical
     trunk_shin_diff = trunk_angle - shin_angle     # trunk-shin bias calculation
+    verticality = abs(180 - trunk_angle)
 
     
     # determine squat bias (glutes/quads/balanced)
@@ -73,30 +74,30 @@ def analyse_squat(landmarks, mp_pose):
     else:
         bias = "Neutral bias"
     
-    # check depth based on reference points (lower angle = deeper squat)
-    if knee_angle < 60:
-        depth = "Too deep"
-        depth_colour = (0, 255, 0)
-        set_feedback.append("Sqaut was too deep. Stop a bit higher to reduce stress on your knee joints. Aim for thighs to be parallel to the ground.")
-    elif 60 <= knee_angle <= 110:
-        depth = "Good"
-        set_feedback.append("Good  depth. Thighs are about parallel to the floor.")
-        depth_colour = (0, 255, 0)
-    else:
-        depth = "Shallow"
-        set_feedback.append("Your squat is bit shallow. Try lowering your hips until thighs are parallel to the ground.")
-        depth_colour = (0, 0, 255)
+    # check depth based on reference points (lower angle = deeper squat) GIVES INCORRECT DEPTH COZ ONLY BASED ON KNEE ANGLE
+    # if knee_angle < 60:
+    #     depth = "Too deep"
+    #     depth_colour = (0, 255, 0)
+    #     set_feedback.append("Sqaut was too deep. Stop a bit higher to reduce stress on your knee joints. Aim for thighs to be parallel to the ground.")
+    # elif 60 <= knee_angle <= 110:
+    #     depth = "Good"
+    #     set_feedback.append("Good  depth. Thighs are about parallel to the floor.")
+    #     depth_colour = (0, 255, 0)
+    # else:
+    #     depth = "Shallow"
+    #     set_feedback.append("Your squat is bit shallow. Try lowering your hips until thighs are parallel to the ground.")
+    #     depth_colour = (0, 0, 255)
     
     # Thigh feedback
-    if thigh_angle <= 20:
+    if thigh_angle >= 160:
         set_feedback.append("Great range of motion. Thighs are almost parallel to ground")
-    elif thigh_angle > 25:
+    elif thigh_angle >= 120:
         set_feedback.append("Try squating lower so your thighs reach a parallel line with the floor.")
 
     # Trunk posture
-    if trunk_angle < 25:
+    if verticality <= 10:
         set_feedback.append("Great upright posture throughout squat")
-    elif 25 <= trunk_angle <= 45:
+    elif 10 <= trunk_angle <= 45:
         set_feedback.append("Slight forward lean while squatting. Try keeping your chest higher up.")
     else:
         set_feedback.append("Too much forward lean. Focus on keeping your chest upright facing forward and engaging your core.")

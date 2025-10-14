@@ -41,9 +41,11 @@ def analyse_video(video_path, exercise_type):
     
     pose = mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) # test other value mb better accuracy
 
+    printed_feedback = False  #only print once to console
+    
     while cap.isOpened():
         ret, frame = cap.read()
-        print("Reading frames")
+        # print("Reading frames")
 
         # if end of video or no frame
         if not ret:
@@ -76,10 +78,24 @@ def analyse_video(video_path, exercise_type):
                 angle, feedback, color, label = analyse_lunge(landmarks, mp_pose)
             elif exercise_type == "plank":
                 angle, feedback, color, label = analyse_plank(landmarks, mp_pose)
+                
+            if not printed_feedback:
+                print("\n#### SET SUMMARY ####")
+                for line in summary:
+                    print(f"• {line}")
+                printed_feedback = True
 
             # Display angle and feedback
-            cv2.putText(frame, f"{summary}", (30, 300),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
+            
+           
+            y_offset = 500 
+            for i, line in enumerate(summary):
+                y = y_offset + i * 40  # vert. space
+                cv2.putText(frame, line, (30, y),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2, cv2.LINE_AA)
+                
+            # cv2.putText(frame, f"{summary}", (30, 300),
+            #             cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
             cv2.putText(frame, f"{label}: {int(angle)}", (30, 70),
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
             cv2.putText(frame, feedback, (30, 120),
