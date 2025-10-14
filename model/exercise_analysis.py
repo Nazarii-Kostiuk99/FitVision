@@ -59,12 +59,30 @@ def analyse_squat(landmarks, mp_pose):
     knee_vertical = [knee[0], knee[1] + 0.3]  # point below knee
 
     knee_angle = calculate_angle(hip, knee, ankle)
-    thigh_angle = calculate_angle(hip, knee, horizontal_ref)
+    thigh_angle = calculate_angle(hip, knee, horizontal_ref)#thigh vs imaginary hor.line (how tilted relative to ground)
     trunk_angle = calculate_angle(shoulder, hip, hip_vertical)# trunk inclination - deviation from vertical
     shin_angle = calculate_angle(knee, ankle, knee_vertical) #shin inclination - shin angle from vertical
     trunk_shin_diff = trunk_angle - shin_angle     # trunk-shin bias calculation
     verticality = abs(180 - trunk_angle)
+    hip_y = hip[1] #vert. pos. of hip
+    knee_y = knee[1] #vert. pos. of knee
+    shoulder_y = shoulder[1] #vert. pos. of shoudler
+    
+    #depth
+    depth_ratio = (hip_y - knee_y) / (shoulder_y - knee_y + 1e-6)
+    if depth_ratio > 0.7:
+        depth = "Too deep"
+        depth_colour = (0, 255, 0)
+        set_feedback.append("Sqaut was too deep. Stop a bit higher to reduce stress on your knee joints. Aim for thighs to be parallel to the ground.")
 
+    elif 0.5 <= depth_ratio < 0.7:
+        depth = "Good"
+        depth_colour = (0, 255, 0)
+        set_feedback.append("Good  depth. Keep it up.")
+    else:
+        depth = "Shallow"
+        depth_colour = (0, 0, 255)
+        set_feedback.append("Your squat is bit shallow. Try lowering your hips until thighs are parallel to the ground.")
     
     # determine squat bias (glutes/quads/balanced)
     if trunk_shin_diff > 10:
@@ -95,32 +113,28 @@ def analyse_squat(landmarks, mp_pose):
         set_feedback.append("Try squating lower so your thighs reach a parallel line with the floor.")
 
     # Trunk posture
-    if verticality <= 10:
+    if verticality < 15:
         set_feedback.append("Great upright posture throughout squat")
-    elif 10 <= trunk_angle <= 45:
+    elif 15 <= verticality < 35:
         set_feedback.append("Slight forward lean while squatting. Try keeping your chest higher up.")
     else:
         set_feedback.append("Too much forward lean. Focus on keeping your chest upright facing forward and engaging your core.")
 
-    ########################## Depth ratio #####################
+  
     
-    # standing_hip_y = max(all_hip_y_values)
-    # bottom_hip_y = min(all_hip_y_values)
-    # depth_ratio = (hip[1] - bottom_hip_y) / (standing_hip_y - bottom_hip_y + 1e-8)
-
-    # if depth_ratio <= 0.55:
-    #     set_feedback.append("Excellent depth control — hips drop below knee line.")
-    # elif 0.55 < depth_ratio <= 0.65:
-    #     set_feedback.append("Good consistent squat depth.")
-    # else:
-    #     set_feedback.append("Not deep enough — lower your hips a bit more for full range.")
-
-    
+    #unpack with these in analyse()
     primary_feedback = f"{depth} | {bias}"
     colour = depth_colour
     display_angle = knee_angle
     label = "Knee Angle"
     summary = set_feedback
     
-    return summary, display_angle, primary_feedback, colour, label, side, 
+    angles = {
+    "knee": (knee_angle, knee),
+    "thigh": (thigh_angle, [(hip[0] + knee[0]) / 2, (hip[1] + knee[1]) / 2]),
+    "trunk": (trunk_angle, hip),
+    "shin": (shin_angle, [(knee[0] + ankle[0]) / 2, (knee[1] + ankle[1]) / 2])
+}
+    
+    return summary, display_angle, primary_feedback, colour, label, side, angles
 

@@ -70,7 +70,7 @@ def analyse_video(video_path, exercise_type):
             
             # call the appropriate exercise type analyser 
             if exercise_type == "squat":
-                summary, angle, feedback, color, label, side = analyse_squat(landmarks, mp_pose)
+                summary, angle, feedback, color, label, side, angles = analyse_squat(landmarks, mp_pose)
                 # print(summary)
             elif exercise_type == "pushup":
                 angle, feedback, color, label = analyse_pushup(landmarks, mp_pose)
@@ -78,6 +78,12 @@ def analyse_video(video_path, exercise_type):
                 angle, feedback, color, label = analyse_lunge(landmarks, mp_pose)
             elif exercise_type == "plank":
                 angle, feedback, color, label = analyse_plank(landmarks, mp_pose)
+             
+             
+             
+             
+             
+             
                 
             if not printed_feedback:
                 print("\n#### SET SUMMARY ####")
@@ -93,15 +99,27 @@ def analyse_video(video_path, exercise_type):
                 y = y_offset + i * 40  # vert. space
                 cv2.putText(frame, line, (30, y),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2, cv2.LINE_AA)
+            
+            #drawing abgles for corresponding joints
+            for name, (ang, coord) in angles.items():
+                x = int(coord[0] * width)
+                y = int(coord[1] * height)
+                cv2.putText(frame, f"{name}: {int(ang)}°",
+                (x + 10, y - 10),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.7,
+                (0, 255, 255), 2, cv2.LINE_AA)
                 
-            # cv2.putText(frame, f"{summary}", (30, 300),
-            #             cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
+                
             cv2.putText(frame, f"{label}: {int(angle)}", (30, 70),
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
             cv2.putText(frame, feedback, (30, 120),
                         cv2.FONT_HERSHEY_SIMPLEX, 1.2, color, 3)
             cv2.putText(frame, f"{side}", (30, 30),
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
+            
+            
+            
+            
 
         # write output video to a separate file (later send to django api -> DB)
         out.write(frame)
