@@ -70,7 +70,7 @@ def analyse_video(video_path, exercise_type):
             
             # call the appropriate exercise type analyser 
             if exercise_type == "squat":
-                summary, angle, feedback, color, label, side, angles = analyse_squat(landmarks, mp_pose)
+                summary, angle, feedback, color, label, side, angles, depth_ratio = analyse_squat(landmarks, mp_pose)
                 # print(summary)
             elif exercise_type == "pushup":
                 angle, feedback, color, label = analyse_pushup(landmarks, mp_pose)
@@ -116,6 +116,12 @@ def analyse_video(video_path, exercise_type):
                         cv2.FONT_HERSHEY_SIMPLEX, 1.2, color, 3)
             cv2.putText(frame, f"{side}", (30, 30),
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
+            
+            
+            #depth ratio
+            cv2.putText(frame, f"Depth Ratio: {depth_ratio:.2f}",
+            (30, 160),  # position below main feedback
+            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2, cv2.LINE_AA)
             
             
             

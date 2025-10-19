@@ -3,14 +3,13 @@ Calulation of angles between joints(ANY exercise)
 """
 
 import numpy as np
-
-
 # dot product method (vector geometry)
 def calculate_angle(a, b, c):
     a = np.array(a)
     b = np.array(b)
     c = np.array(c)
     
+    #vectors
     ba = a - b
     bc = c - b
     

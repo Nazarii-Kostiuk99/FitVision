@@ -69,28 +69,28 @@ def analyse_squat(landmarks, mp_pose):
     shoulder_y = shoulder[1] #vert. pos. of shoudler
     
     #depth
-    depth_ratio = (hip_y - knee_y) / (shoulder_y - knee_y + 1e-6)
-    if depth_ratio > 0.7:
+    depth_ratio = (shoulder_y - hip_y) / (shoulder_y - knee_y + 1e-6)
+    if depth_ratio < 0.6:
         depth = "Too deep"
         depth_colour = (0, 255, 0)
         set_feedback.append("Sqaut was too deep. Stop a bit higher to reduce stress on your knee joints. Aim for thighs to be parallel to the ground.")
 
-    elif 0.5 <= depth_ratio < 0.7:
+    elif 0.6 <= depth_ratio < 0.9:
         depth = "Good"
         depth_colour = (0, 255, 0)
         set_feedback.append("Good  depth. Keep it up.")
-    else:
+    elif depth_ratio >0.9:
         depth = "Shallow"
         depth_colour = (0, 0, 255)
         set_feedback.append("Your squat is bit shallow. Try lowering your hips until thighs are parallel to the ground.")
     
     # determine squat bias (glutes/quads/balanced)
-    if trunk_shin_diff > 10:
-        bias = "Hip-biased (glutes)"
-    elif trunk_shin_diff < -10:
-        bias = "Knee-biased (quads)"
-    else:
-        bias = "Neutral bias"
+    # if trunk_shin_diff > 10:
+    #     bias = "Hip-biased (glutes)"
+    # elif trunk_shin_diff < -10:
+    #     bias = "Knee-biased (quads)"
+    # else:
+    #     bias = "Neutral bias"
     
     # check depth based on reference points (lower angle = deeper squat) GIVES INCORRECT DEPTH COZ ONLY BASED ON KNEE ANGLE
     # if knee_angle < 60:
@@ -108,7 +108,7 @@ def analyse_squat(landmarks, mp_pose):
     
     # Thigh feedback
     if thigh_angle >= 160:
-        set_feedback.append("Great range of motion. Thighs are almost parallel to ground")
+        set_feedback.append("Great range of motion. Thighs are parallel to ground")
     elif thigh_angle >= 120:
         set_feedback.append("Try squating lower so your thighs reach a parallel line with the floor.")
 
@@ -123,7 +123,7 @@ def analyse_squat(landmarks, mp_pose):
   
     
     #unpack with these in analyse()
-    primary_feedback = f"{depth} | {bias}"
+    primary_feedback = f"{depth}"
     colour = depth_colour
     display_angle = knee_angle
     label = "Knee Angle"
@@ -136,5 +136,5 @@ def analyse_squat(landmarks, mp_pose):
     "shin": (shin_angle, [(knee[0] + ankle[0]) / 2, (knee[1] + ankle[1]) / 2])
 }
     
-    return summary, display_angle, primary_feedback, colour, label, side, angles
+    return summary, display_angle, primary_feedback, colour, label, side, angles, depth_ratio
 
