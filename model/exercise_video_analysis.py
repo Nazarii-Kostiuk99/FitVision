@@ -22,6 +22,8 @@ def analyse_video(video_path, exercise_type):
     
     reps = 0
     state = "up"
+    set_feedback=[]
+    
 
     mp_pose = mediapipe.solutions.pose
     mp_drawing = mediapipe.solutions.drawing_utils
@@ -74,7 +76,7 @@ def analyse_video(video_path, exercise_type):
             
             # call the appropriate exercise type analyser 
             if exercise_type == "squat":
-                summary, angle, feedback, color, label, side, angles, depth_ratio,reps = analyse_squat(landmarks, mp_pose, reps, state="up")
+                summary, angle, feedback, color, label, side, angles, depth_ratio,reps, state = analyse_squat(landmarks, mp_pose, reps, state)
                 # print(summary)
             elif exercise_type == "pushup":
                 angle, feedback, color, label = analyse_pushup(landmarks, mp_pose)
@@ -83,17 +85,24 @@ def analyse_video(video_path, exercise_type):
             elif exercise_type == "plank":
                 angle, feedback, color, label = analyse_plank(landmarks, mp_pose)
              
-             
+            if state == "up" and len(set_feedback) < reps:
+                set_feedback.append({
+                "rep": reps,
+                "feedback": summary,           
+            })
+            print(f"\n### FEEDBACK FOR REP {reps} ###")
+            for line in summary:
+                print(f"• {line}")
              
              
              
              
                 
-            if not printed_feedback:
-                print("\n#### SET SUMMARY ####")
-                for line in summary:
-                    print(f"• {line}")
-                printed_feedback = True
+            # if not printed_feedback:
+            #     print("\n#### SET SUMMARY ####")
+            #     for line in summary:
+            #         print(f"• {line}")
+            #     printed_feedback = True
 
             # Display angle and feedback
             
@@ -129,6 +138,9 @@ def analyse_video(video_path, exercise_type):
             
             
             cv2.putText(frame, f"Reps: {reps}", (30, 200),
+            cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 255), 3)
+            
+            cv2.putText(frame, f"State: {state}", (30, 300),
             cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 255), 3)
             
             

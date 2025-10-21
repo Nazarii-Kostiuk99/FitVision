@@ -87,7 +87,7 @@ def analyse_squat(landmarks, mp_pose, reps, state):
         depth_colour = (0, 255, 0)
         set_feedback.append("Good  depth. Keep it up.")
         
-    elif 0.6 <= depth_ratio < 0.7: #hips above knees
+    elif 0.5 <= depth_ratio < 0.7: #hips above knees
         depth = "Shallow"
         depth_colour = (0, 0, 255)
         set_feedback.append("Your squat is bit shallow. Try lowering your hips until thighs are parallel to the ground.")
@@ -100,7 +100,7 @@ def analyse_squat(landmarks, mp_pose, reps, state):
     # Thigh feedback
     if thigh_angle >= 160:
         set_feedback.append("Great range of motion. Thighs are parallel to ground")
-    elif thigh_angle >= 120:
+    elif thigh_angle >= 100:
         set_feedback.append("Try squating lower so your thighs reach a parallel line with the floor.")
 
     # Trunk posture
@@ -114,7 +114,7 @@ def analyse_squat(landmarks, mp_pose, reps, state):
   ####################### repetitions counter ########################
   
     #resets the state if incorrectly set to down
-    if state == "up" and depth_ratio > 0.7 and knee_angle < 100:
+    if state == "up" and depth_ratio > 0.5 and knee_angle < 100:
         state = "down"
 
     # Coming back up — counts as one rep
@@ -141,5 +141,5 @@ def analyse_squat(landmarks, mp_pose, reps, state):
     "shin": (shin_angle, [(knee[0] + ankle[0]) / 2, (knee[1] + ankle[1]) / 2])
 }
     
-    return summary, display_angle, primary_feedback, colour, label, side, angles, depth_ratio, reps
+    return summary, display_angle, primary_feedback, colour, label, side, angles, depth_ratio, reps, state
 
