@@ -18,6 +18,10 @@ def analyse_video(video_path, exercise_type):
         return
     
     video_path = mov_to_mp4(video_path) # mov(iphone format) -> mp4 
+    
+    
+    reps = 0
+    state = "up"
 
     mp_pose = mediapipe.solutions.pose
     mp_drawing = mediapipe.solutions.drawing_utils
@@ -70,7 +74,7 @@ def analyse_video(video_path, exercise_type):
             
             # call the appropriate exercise type analyser 
             if exercise_type == "squat":
-                summary, angle, feedback, color, label, side, angles, depth_ratio = analyse_squat(landmarks, mp_pose)
+                summary, angle, feedback, color, label, side, angles, depth_ratio,reps = analyse_squat(landmarks, mp_pose, reps, state="up")
                 # print(summary)
             elif exercise_type == "pushup":
                 angle, feedback, color, label = analyse_pushup(landmarks, mp_pose)
@@ -118,10 +122,14 @@ def analyse_video(video_path, exercise_type):
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
             
             
-            #depth ratio
+            
             cv2.putText(frame, f"Depth Ratio: {depth_ratio:.2f}",
             (30, 160),  # position below main feedback
             cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2, cv2.LINE_AA)
+            
+            
+            cv2.putText(frame, f"Reps: {reps}", (30, 200),
+            cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 255), 3)
             
             
             

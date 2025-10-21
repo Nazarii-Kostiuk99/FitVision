@@ -4,9 +4,13 @@ Exercise form analysis functions
 from angle_calculations import calculate_angle
 
 
+
 ############################################# SQUAT ANALYSIS ################################################
-def analyse_squat(landmarks, mp_pose):
+def analyse_squat(landmarks, mp_pose, reps, state):
     set_feedback=[]
+    
+ 
+    
     """
     Squat form analysis
     
@@ -68,44 +72,31 @@ def analyse_squat(landmarks, mp_pose):
     knee_y = knee[1] #vert. pos. of knee
     shoulder_y = shoulder[1] #vert. pos. of shoudler
     
+    
+    ####################### squat analysis ########################
+    
     #depth
     depth_ratio = (shoulder_y - hip_y) / (shoulder_y - knee_y + 1e-6)
-    if depth_ratio < 0.6:
-        depth = "Too deep"
+    if depth_ratio > 1.2: #play around with this value for most accurate results
+        depth = "Too deep" #hips below knees
         depth_colour = (0, 255, 0)
         set_feedback.append("Sqaut was too deep. Stop a bit higher to reduce stress on your knee joints. Aim for thighs to be parallel to the ground.")
-
-    elif 0.6 <= depth_ratio < 0.9:
+        
+    elif 0.7 <= depth_ratio <= 1.2: #hips approx. at same level with knees
         depth = "Good"
         depth_colour = (0, 255, 0)
         set_feedback.append("Good  depth. Keep it up.")
-    elif depth_ratio >0.9:
+        
+    elif 0.6 <= depth_ratio < 0.7: #hips above knees
         depth = "Shallow"
         depth_colour = (0, 0, 255)
         set_feedback.append("Your squat is bit shallow. Try lowering your hips until thighs are parallel to the ground.")
     
-    # determine squat bias (glutes/quads/balanced)
-    # if trunk_shin_diff > 10:
-    #     bias = "Hip-biased (glutes)"
-    # elif trunk_shin_diff < -10:
-    #     bias = "Knee-biased (quads)"
-    # else:
-    #     bias = "Neutral bias"
-    
-    # check depth based on reference points (lower angle = deeper squat) GIVES INCORRECT DEPTH COZ ONLY BASED ON KNEE ANGLE
-    # if knee_angle < 60:
-    #     depth = "Too deep"
-    #     depth_colour = (0, 255, 0)
-    #     set_feedback.append("Sqaut was too deep. Stop a bit higher to reduce stress on your knee joints. Aim for thighs to be parallel to the ground.")
-    # elif 60 <= knee_angle <= 110:
-    #     depth = "Good"
-    #     set_feedback.append("Good  depth. Thighs are about parallel to the floor.")
-    #     depth_colour = (0, 255, 0)
-    # else:
-    #     depth = "Shallow"
-    #     set_feedback.append("Your squat is bit shallow. Try lowering your hips until thighs are parallel to the ground.")
-    #     depth_colour = (0, 0, 255)
-    
+    else:
+        depth = "Not detected"
+        depth_colour = (255, 255, 255)
+        set_feedback.append("No squat detected yet — start your set to begin analysis.")
+
     # Thigh feedback
     if thigh_angle >= 160:
         set_feedback.append("Great range of motion. Thighs are parallel to ground")
@@ -120,6 +111,20 @@ def analyse_squat(landmarks, mp_pose):
     else:
         set_feedback.append("Too much forward lean. Focus on keeping your chest upright facing forward and engaging your core.")
 
+  ####################### repetitions counter ########################
+  
+    #resets the state if incorrectly set to down
+    if state == "up" and depth_ratio > 0.7 and knee_angle < 100:
+        state = "down"
+
+    # Coming back up — counts as one rep
+    elif state == "down" and depth_ratio < 0.6 and knee_angle > 160:
+        state = "up"
+        reps += 1
+  
+  
+  
+  
   
     
     #unpack with these in analyse()
@@ -136,5 +141,5 @@ def analyse_squat(landmarks, mp_pose):
     "shin": (shin_angle, [(knee[0] + ankle[0]) / 2, (knee[1] + ankle[1]) / 2])
 }
     
-    return summary, display_angle, primary_feedback, colour, label, side, angles, depth_ratio
+    return summary, display_angle, primary_feedback, colour, label, side, angles, depth_ratio, reps
 
