@@ -4,7 +4,7 @@ import mediapipe
 import numpy as np
 from video_utility import mov_to_mp4, preprocess_video
 from angle_calculations import calculate_angle
-from exercise_analysis import analyse_squat
+from exercise_analysis import analyse_squat, get_initial_rep_data
 
 # analyse_pushup, analyse_lunge, analyse_plank
 
@@ -23,18 +23,14 @@ def analyse_video(video_path, exercise_type):
 
     reps = 0
     state = "up"
-    set_feedback = []
+    rep_data = get_initial_rep_data()
+    rep_feedback_blocks = []
 
     mp_pose = mediapipe.solutions.pose
     mp_drawing = mediapipe.solutions.drawing_utils
 
     # opencv reads a video from a file
     cap = cv2.VideoCapture(video_path)
-    # if not cap.isOpened():
-    #     print(f"Failed to open video file: {video_path}")
-    #     return
-    # else:
-    #     print(f"Opened video: {video_path}")
 
     # record fps, dimensions of input video
     fps = int(cap.get(cv2.CAP_PROP_FPS))
@@ -49,15 +45,11 @@ def analyse_video(video_path, exercise_type):
         min_detection_confidence=0.5, min_tracking_confidence=0.5
     )  # test other value mb better accuracy
 
-    printed_feedback = False  # only print once to console
-
     while cap.isOpened():
         ret, frame = cap.read()
-        # print("Reading frames")
 
         # if end of video or no frame
         if not ret:
-            #     # print("Failed to read frame or end")
             break
 
         # rgb for mediapipe
@@ -91,117 +83,73 @@ def analyse_video(video_path, exercise_type):
                     depth_ratio,
                     reps,
                     state,
-                ) = analyse_squat(landmarks, mp_pose, reps, state)
-                # print(summary)
-            elif exercise_type == "pushup":
-                angle, feedback, color, label = analyse_pushup(landmarks, mp_pose)
-            elif exercise_type == "lunge":
-                angle, feedback, color, label = analyse_lunge(landmarks, mp_pose)
-            elif exercise_type == "plank":
-                angle, feedback, color, label = analyse_plank(landmarks, mp_pose)
-
-            if state == "up" and len(set_feedback) < reps:
-                set_feedback.append(
-                    {
-                        "rep": reps,
-                        "feedback": summary,
-                    }
+                    rep_data,
+                    rep_feedback_blocks,
+                    heel_lifted_current,
+                    lean_angle,
+                ) = analyse_squat(
+                    landmarks, mp_pose, reps, state, rep_data, rep_feedback_blocks
                 )
-            print(f"\n### FEEDBACK FOR REP {reps} ###")
-            for line in summary:
-                print(f"• {line}")
 
-            # if not printed_feedback:
-            #     print("\n#### SET SUMMARY ####")
-            #     for line in summary:
-            #         print(f"• {line}")
-            #     printed_feedback = True
-
-            # Display angle and feedback
-
-            y_offset = 500
-            for i, line in enumerate(summary):
-                y = y_offset + i * 40  # vert. space
+            # --- DEBUG PANEL ---
+            cv2.rectangle(frame, (width - 320, 10), (width - 10, 260), (0, 0, 0), -1)
+            debug_stats = [
+                (f"State: {state}", (255, 0, 255)),
+                (f"CUR Depth: {depth_ratio:.2f}", (0, 255, 0)),
+                (f"MAX Depth: {rep_data['max_depth_ratio']:.2f}", (0, 255, 255)),
+                (f"CUR Knee: {int(angle)}", (0, 255, 0)),
+                (f"MIN Knee: {int(rep_data['min_knee_angle'])}", (0, 255, 255)),
+                (f"Lean (deg): {lean_angle:.1f}", (0, 255, 255)),
+                (f"Heel Lift: {heel_lifted_current}", (0, 255, 255)),
+            ]
+            for i, (text, col) in enumerate(debug_stats):
                 cv2.putText(
                     frame,
-                    line,
-                    (30, y),
+                    text,
+                    (width - 300, 40 + (i * 35)),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.7,
-                    (0, 255, 255),
+                    col,
                     2,
-                    cv2.LINE_AA,
                 )
 
-            # drawing abgles for corresponding joints
+            # --- MAIN DISPLAY (Left Side) ---
+            cv2.putText(
+                frame,
+                f"REPS: {reps}",
+                (30, 60),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                1.5,
+                (0, 255, 255),
+                3,
+            )
+
+            cv2.putText(
+                frame, feedback, (30, 110), cv2.FONT_HERSHEY_SIMPLEX, 1.2, color, 3
+            )
+            cv2.putText(
+                frame,
+                f"Side: {side}",
+                (30, 150),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.8,
+                (255, 255, 255),
+                2,
+            )
+
+            # drawing angles for corresponding joints
             for name, (ang, coord) in angles.items():
                 x = int(coord[0] * width)
                 y = int(coord[1] * height)
                 cv2.putText(
                     frame,
-                    f"{name}: {int(ang)}°",
+                    f"{int(ang)}",
                     (x + 10, y - 10),
                     cv2.FONT_HERSHEY_SIMPLEX,
-                    0.7,
-                    (0, 255, 255),
+                    0.6,
+                    (255, 255, 255),
                     2,
-                    cv2.LINE_AA,
                 )
-
-            cv2.putText(
-                frame,
-                f"{label}: {int(angle)}",
-                (30, 70),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                1,
-                (255, 255, 255),
-                2,
-                cv2.LINE_AA,
-            )
-            cv2.putText(
-                frame, feedback, (30, 120), cv2.FONT_HERSHEY_SIMPLEX, 1.2, color, 3
-            )
-            cv2.putText(
-                frame,
-                f"{side}",
-                (30, 30),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                1,
-                (255, 255, 255),
-                2,
-                cv2.LINE_AA,
-            )
-
-            cv2.putText(
-                frame,
-                f"Depth Ratio: {depth_ratio:.2f}",
-                (30, 160),  # position below main feedback
-                cv2.FONT_HERSHEY_SIMPLEX,
-                1,
-                (0, 255, 255),
-                2,
-                cv2.LINE_AA,
-            )
-
-            cv2.putText(
-                frame,
-                f"Reps: {reps}",
-                (30, 200),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                1.2,
-                (0, 255, 255),
-                3,
-            )
-
-            cv2.putText(
-                frame,
-                f"State: {state}",
-                (30, 300),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                1.2,
-                (0, 255, 255),
-                3,
-            )
 
         # write output video to a separate file (later send to django api -> DB)
         out.write(frame)
@@ -209,6 +157,19 @@ def analyse_video(video_path, exercise_type):
     cap.release()
     out.release()
     cv2.destroyAllWindows()
+
+    # PRINT FEEDBACK ONCE PER REP (end of video)
+    print("\n==============================")
+    print("FINAL SET FEEDBACK (PER REP)")
+    print("==============================")
+
+    if len(rep_feedback_blocks) == 0:
+        print("No reps detected.")
+    else:
+        for block in rep_feedback_blocks:
+            print(f"\n### REP {block['rep']} ({block['side']}) ###")
+            for line in block["feedback"]:
+                print(f"• {line}")
 
 
 # entry point

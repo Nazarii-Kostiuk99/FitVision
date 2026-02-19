@@ -37,7 +37,7 @@ def anonymise_video(input_video_path):
     # for consistent blur box when lost track of face frames
     last_bbox = None
     no_face_frames = 0
-    allowed_no_face_frames = 5
+    allowed_no_face_frames = 10
 
     mp_face = mediapipe.solutions.face_detection
     detector = mp_face.FaceDetection(model_selection=1, min_detection_confidence=0.5)

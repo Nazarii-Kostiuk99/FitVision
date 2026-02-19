@@ -2,11 +2,70 @@
 Exercise form analysis functions
 """
 
-from angle_calculations import calculate_angle
+from angle_calculations import calculate_angle, angle_to_vertical_degrees
+import statistics
 
 
 ############################################# SQUAT ANALYSIS ################################################
-def analyse_squat(landmarks, mp_pose, reps, state):
+
+
+# repetition data for feeback generation, tracker to be reset after each rep
+def get_initial_rep_data():
+    return {
+        "max_depth_ratio": 0,
+        "min_knee_angle": 999,
+        "lean_angles": [],
+        "min_thigh_angle": 999,
+        "lowest_point_angles": None,  # store angles dict at lowest point
+        "side": None,
+        "heels_lifted": False,
+        "valid": False,
+    }
+
+
+def rep_score(depth_result, thigh_result, posture_result, heels_result):
+    score = 100
+
+    # Depth
+    if depth_result == "Shallow":
+        score -= 25
+    elif depth_result == "Too deep":
+        score -= 10
+    elif depth_result == "Not clearly detected":
+        score -= 20
+
+    # Thighs
+    if thigh_result == "Needs lower":
+        score -= 15
+    elif thigh_result == "Not detected":
+        score -= 10
+
+    # Posture
+    if posture_result == "Slight forward lean":
+        score -= 10
+    elif posture_result == "Too much forward lean":
+        score -= 25
+
+    # Heels
+    if heels_result.startswith("Heels lifted"):
+        score -= 15
+
+    score = max(0, min(100, score))
+
+    # Grade
+    if score >= 90:
+        grade = "Excellent"
+    elif score >= 75:
+        grade = "Good"
+    elif score >= 55:
+        grade = "Okay"
+    else:
+        grade = "Needs work"
+
+    return score, grade
+
+
+def analyse_squat(landmarks, mp_pose, reps, state, rep_data, rep_feedback_blocks):
     # set_feedback = []
 
     """ """
@@ -46,16 +105,48 @@ def analyse_squat(landmarks, mp_pose, reps, state):
         landmarks[mp_pose.PoseLandmark.LEFT_ANKLE.value].y,
     ]
 
+    r_heel = [
+        landmarks[mp_pose.PoseLandmark.RIGHT_HEEL.value].x,
+        landmarks[mp_pose.PoseLandmark.RIGHT_HEEL.value].y,
+    ]
+    r_foot_index = [
+        landmarks[mp_pose.PoseLandmark.RIGHT_FOOT_INDEX.value].x,
+        landmarks[mp_pose.PoseLandmark.RIGHT_FOOT_INDEX.value].y,
+    ]
+
+    l_heel = [
+        landmarks[mp_pose.PoseLandmark.LEFT_HEEL.value].x,
+        landmarks[mp_pose.PoseLandmark.LEFT_HEEL.value].y,
+    ]
+    l_foot_index = [
+        landmarks[mp_pose.PoseLandmark.LEFT_FOOT_INDEX.value].x,
+        landmarks[mp_pose.PoseLandmark.LEFT_FOOT_INDEX.value].y,
+    ]
+
     # check visibility (to determine side l/r)
     r_visibility = landmarks[mp_pose.PoseLandmark.RIGHT_KNEE.value].visibility
     l_visibility = landmarks[mp_pose.PoseLandmark.LEFT_KNEE.value].visibility
 
     # choose side with better visibility
     if r_visibility > l_visibility:
-        shoulder, hip, knee, ankle = r_shoulder, r_hip, r_knee, r_ankle
+        shoulder, hip, knee, ankle, heel, foot_index = (
+            r_shoulder,
+            r_hip,
+            r_knee,
+            r_ankle,
+            r_heel,
+            r_foot_index,
+        )
         side = "Right side"
     else:
-        shoulder, hip, knee, ankle = l_shoulder, l_hip, l_knee, l_ankle
+        shoulder, hip, knee, ankle, heel, foot_index = (
+            l_shoulder,
+            l_hip,
+            l_knee,
+            l_ankle,
+            l_heel,
+            l_foot_index,
+        )
         side = "Left side"
 
     # utility for thigh angle calc
@@ -72,109 +163,171 @@ def analyse_squat(landmarks, mp_pose, reps, state):
 
     ####################### calculation of key angles ########################
 
-    hip_vertical = [hip[0], hip[1] + 0.3]  # point below hip for vert. ref.
-    knee_vertical = [knee[0], knee[1] + 0.3]  # point below knee
-
     knee_angle = calculate_angle(hip, knee, ankle)
     thigh_angle = calculate_angle(
         hip, knee, horizontal_ref
     )  # thigh vs imaginary hor.line (how tilted relative to ground)
-    trunk_angle = calculate_angle(
-        shoulder, hip, hip_vertical
-    )  # trunk inclination - deviation from vertical
-    # shin_angle = calculate_angle(
-    #     knee, ankle, knee_vertical
-    # )  # shin inclination - shin angle from vertical
-    # trunk_shin_diff = trunk_angle - shin_angle  # trunk-shin bias calculation
-    verticality = abs(180 - trunk_angle)
     hip_y = hip[1]  # vert. pos. of hip
     knee_y = knee[1]  # vert. pos. of knee
     shoulder_y = shoulder[1]  # vert. pos. of shoudler
 
-    rep_feedback = []
     depth_ratio = (shoulder_y - hip_y) / (shoulder_y - knee_y + 1e-6)
 
+    # heels
+    heel_lift_threshold = 0.03
+    heel_lifted_current = (foot_index[1] - heel[1]) > heel_lift_threshold
+
+    # lean
+    lean_angle = angle_to_vertical_degrees(hip, shoulder)
+
     ####################### squat analysis ########################
-
-    # only consider feedback when state - down (avoid false feedback when thresholds triggered when satnding still for example)
-
-    if state == "down":
-        # depth
-        if depth_ratio > 1.2:  # play around with this value for most accurate results
-            depth = "Too deep"  # hips below knees
-            depth_colour = (0, 255, 0)
-            rep_feedback.append(
-                "Sqaut was too deep. Stop a bit higher to reduce stress on your knee joints. Aim for thighs to be parallel to the ground."
-            )
-
-        elif 0.7 <= depth_ratio <= 1.2:  # hips approx. at same level with knees
-            depth = "Good"
-            depth_colour = (0, 255, 0)
-            rep_feedback.append("Good  depth. Keep it up.")
-
-        elif 0.6 <= depth_ratio < 0.7:  # hips above knees
-            depth = "Shallow"
-            depth_colour = (0, 0, 255)
-            rep_feedback.append(
-                "Your squat is bit shallow. Try lowering your hips until thighs are parallel to the ground."
-            )
-
-        else:
-            depth = "Not detected"
-            depth_colour = (255, 255, 255)
-            rep_feedback.append(
-                "No squat detected yet — start your set to begin analysis."
-            )
-
-        # Thigh feedback
-        if thigh_angle >= 160:
-            rep_feedback.append("Great range of motion. Thighs are parallel to ground")
-        elif thigh_angle >= 100:
-            rep_feedback.append(
-                "Try squating lower so your thighs reach a parallel line with the floor."
-            )
-
-        # Trunk posture
-        if verticality < 15:
-            rep_feedback.append("Great upright posture throughout squat")
-        elif 15 <= verticality < 35:
-            rep_feedback.append(
-                "Slight forward lean while squatting. Try keeping your chest higher up."
-            )
-        else:
-            rep_feedback.append(
-                "Too much forward lean. Focus on keeping your chest upright facing forward and engaging your core."
-            )
-    else:
-        # ready position
-        depth = "Ready"
-        depth_colour = (255, 255, 255)
-        rep_feedback = ["Begin your squat when ready."]
-
-    ####################### repetitions counter ########################
-
-    # resets the state if incorrectly set to down
-    if state == "up" and depth_ratio > 0.5 and knee_angle < 100:
-        state = "down"
-
-    # Coming back up — counts as one rep
-    elif state == "down" and depth_ratio < 0.6 and knee_angle > 160:
-        state = "up"
-        reps += 1
-
-    # unpack with these in analyse()
-    primary_feedback = f"{depth}"
-    colour = depth_colour
-    display_angle = knee_angle
-    label = "Knee Angle"
-    summary = rep_feedback
-
     angles = {
         "knee": (knee_angle, knee),
         "thigh": (thigh_angle, [(hip[0] + knee[0]) / 2, (hip[1] + knee[1]) / 2]),
-        "trunk": (trunk_angle, hip),
-        # "shin": (shin_angle, [(knee[0] + ankle[0]) / 2, (knee[1] + ankle[1]) / 2]),
     }
+
+    ####################### REP STATE MACHINE & TRACKING ########################
+    if state == "down":
+        rep_data["valid"] = True
+        rep_data["side"] = side
+        rep_data["max_depth_ratio"] = max(rep_data["max_depth_ratio"], depth_ratio)
+        rep_data["min_knee_angle"] = min(rep_data["min_knee_angle"], knee_angle)
+        rep_data["min_thigh_angle"] = min(rep_data["min_thigh_angle"], thigh_angle)
+        rep_data["lean_angles"].append(lean_angle)
+        rep_data["heels_lifted"] = rep_data["heels_lifted"] or heel_lifted_current
+
+    # state transitions
+    rep_finished = False
+    if state == "up" and depth_ratio > 0.5 and knee_angle < 100:
+        state = "down"
+    elif state == "down" and depth_ratio < 0.6 and knee_angle > 160:
+        state = "up"
+        reps += 1
+        rep_finished = True
+
+    ####################### BUILD FEEDBACK ONLY WHEN REP FINISHES ########################
+
+    if rep_finished and rep_data["valid"]:
+        rep_feedback = []
+
+        max_depth = rep_data["max_depth_ratio"]
+        min_thigh = rep_data["min_thigh_angle"]
+        # worst_verticality = rep_data["max_verticality"]
+
+        heels_lifted = rep_data["heels_lifted"]
+
+        # Depth feedback
+        # if max_depth > 1.2:
+        #     rep_feedback.append(
+        #         "Squat was too deep. Stop a bit higher to reduce stress on your knees."
+        #     )
+        # elif 0.7 <= max_depth <= 1.2:
+        #     rep_feedback.append("Good depth. Hips reached knee level.")
+        # elif 0.6 <= max_depth < 0.7:
+        #     rep_feedback.append(
+        #         "Squat was shallow. Try lowering until thighs are parallel to the floor."
+        #     )
+        # else:
+        #     rep_feedback.append("Depth not clearly detected.")
+
+        # # Thigh feedback
+        # if min_thigh >= 160:
+        #     rep_feedback.append("Great range of motion. Thighs reached parallel.")
+        # elif min_thigh >= 100:
+        #     rep_feedback.append("Try squatting lower for a better range of motion.")
+
+        # # Trunk posture
+        # if worst_verticality < 15:
+        #     rep_feedback.append("Great upright posture.")
+        # elif 15 <= worst_verticality < 35:
+        #     rep_feedback.append("Slight forward lean. Try keeping your chest higher.")
+        # else:
+        #     rep_feedback.append(
+        #         "Too much forward lean. Engage core and keep chest upright."
+        #     )
+        # ---------------- DEPTH  ----------------
+        if max_depth > 1.2:
+            depth_result = "Too deep"
+        elif 0.7 <= max_depth <= 1.2:
+            depth_result = "Good depth"
+        elif 0.6 <= max_depth < 0.7:
+            depth_result = "Shallow"
+        else:
+            depth_result = "Not clearly detected"
+
+        # ---------------- THIGHS  ----------------
+        if min_thigh >= 160:
+            thigh_result = "Great range of motion"
+        elif min_thigh >= 100:
+            thigh_result = "Needs lower"
+        else:
+            thigh_result = "Not detected"
+
+        # ---------------- POSTURE  ----------------
+        if len(rep_data["lean_angles"]) > 0:
+            rep_lean = statistics.median(rep_data["lean_angles"])
+        else:
+            rep_lean = 0
+
+        if rep_lean < 15:
+            posture_result = "Great upright posture"
+        elif rep_lean < 25:
+            posture_result = "Slight forward lean"
+        elif rep_lean < 35:
+            posture_result = "Forward lean"
+        else:
+            posture_result = "Too much forward lean"
+
+        # ---------------- HEELS  ----------------
+        if heels_lifted:
+            heels_result = "Heels lifted — keep weight mid-foot / heel"
+        else:
+            heels_result = "Stable"
+        score, grade = rep_score(
+            depth_result, thigh_result, posture_result, heels_result
+        )
+
+        rep_feedback.append(f"Score: {score}/100 ({grade})")
+        rep_feedback.append(f"Depth: {depth_result}")
+        rep_feedback.append(f"Thighs: {thigh_result}")
+        rep_feedback.append(f"Posture: {posture_result}")
+        rep_feedback.append(f"Heels: {heels_result}")
+
+        rep_feedback_blocks.append(
+            {
+                "score": score,
+                "grade": grade,
+                "rep": reps,
+                "side": rep_data["side"],
+                "feedback": rep_feedback,
+                "max_depth_ratio": rep_data["max_depth_ratio"],
+                "min_knee_angle": rep_data["min_knee_angle"],
+                "lean_median": rep_lean,
+                "min_thigh_angle": rep_data["min_thigh_angle"],
+                "depth_result": depth_result,
+                "thigh_result": thigh_result,
+                "posture_result": posture_result,
+                "heels_result": heels_result,
+            }
+        )
+
+        # reset for next rep
+        rep_data = get_initial_rep_data()
+
+    ####################### PER-FRAME DISPLAY FEEDBACK ########################
+
+    if state == "down":
+        primary_feedback = "Down"
+        colour = (0, 255, 255)
+    else:
+        primary_feedback = "Ready"
+        colour = (255, 255, 255)
+
+    display_angle = knee_angle
+    label = "Knee Angle"
+
+    # only shows 1 line overlay summary
+    summary = [f"State: {state}"]
 
     return (
         summary,
@@ -187,4 +340,8 @@ def analyse_squat(landmarks, mp_pose, reps, state):
         depth_ratio,
         reps,
         state,
+        rep_data,
+        rep_feedback_blocks,
+        heel_lifted_current,
+        lean_angle,
     )
