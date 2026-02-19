@@ -2,7 +2,11 @@
 Exercise form analysis functions
 """
 
-from angle_calculations import calculate_angle, angle_to_vertical_degrees
+from angle_calculations import (
+    calculate_angle,
+    angle_to_vertical_degrees,
+    thigh_to_horizontal,
+)
 import statistics
 
 
@@ -15,7 +19,7 @@ def get_initial_rep_data():
         "max_depth_ratio": 0,
         "min_knee_angle": 999,
         "lean_angles": [],
-        "min_thigh_angle": 999,
+        "max_thigh_angle": 0,
         "lowest_point_angles": None,  # store angles dict at lowest point
         "side": None,
         "heels_lifted": False,
@@ -35,9 +39,9 @@ def rep_score(depth_result, thigh_result, posture_result, heels_result):
         score -= 20
 
     # Thighs
-    if thigh_result == "Needs lower":
-        score -= 15
-    elif thigh_result == "Not detected":
+    if thigh_result == "Not reaching parallel":
+        score -= 20
+    elif thigh_result == "Thigs are slightly above parallel":
         score -= 10
 
     # Posture
@@ -149,24 +153,22 @@ def analyse_squat(landmarks, mp_pose, reps, state, rep_data, rep_feedback_blocks
         )
         side = "Left side"
 
-    # utility for thigh angle calc
-    if side == "Right side":
-        horizontal_ref = [
-            knee[0] + 0.3,
-            knee[1],
-        ]  # point to the right of knee for hor. ref.
-    else:
-        horizontal_ref = [
-            knee[0] - 0.3,
-            knee[1],
-        ]  # point to the left of knee for hor. ref.
+    # # utility for thigh angle calc
+    # if side == "Right side":
+    #     horizontal_ref = [
+    #         knee[0] + 0.3,
+    #         knee[1],
+    #     ]  # point to the right of knee for hor. ref.
+    # else:
+    #     horizontal_ref = [
+    #         knee[0] - 0.3,
+    #         knee[1],
+    #     ]  # point to the left of knee for hor. ref.
 
     ####################### calculation of key angles ########################
 
     knee_angle = calculate_angle(hip, knee, ankle)
-    thigh_angle = calculate_angle(
-        hip, knee, horizontal_ref
-    )  # thigh vs imaginary hor.line (how tilted relative to ground)
+    thigh_angle = thigh_to_horizontal(hip, knee)
     hip_y = hip[1]  # vert. pos. of hip
     knee_y = knee[1]  # vert. pos. of knee
     shoulder_y = shoulder[1]  # vert. pos. of shoudler
@@ -192,7 +194,7 @@ def analyse_squat(landmarks, mp_pose, reps, state, rep_data, rep_feedback_blocks
         rep_data["side"] = side
         rep_data["max_depth_ratio"] = max(rep_data["max_depth_ratio"], depth_ratio)
         rep_data["min_knee_angle"] = min(rep_data["min_knee_angle"], knee_angle)
-        rep_data["min_thigh_angle"] = min(rep_data["min_thigh_angle"], thigh_angle)
+        rep_data["max_thigh_angle"] = max(rep_data["max_thigh_angle"], thigh_angle)
         rep_data["lean_angles"].append(lean_angle)
         rep_data["heels_lifted"] = rep_data["heels_lifted"] or heel_lifted_current
 
@@ -208,10 +210,11 @@ def analyse_squat(landmarks, mp_pose, reps, state, rep_data, rep_feedback_blocks
     ####################### BUILD FEEDBACK ONLY WHEN REP FINISHES ########################
 
     if rep_finished and rep_data["valid"]:
+        print(f"DEBUG max_thigh: {rep_data['max_thigh_angle']:.1f}")
         rep_feedback = []
 
         max_depth = rep_data["max_depth_ratio"]
-        min_thigh = rep_data["min_thigh_angle"]
+        # min_thigh = rep_data["min_thigh_angle"]
         # worst_verticality = rep_data["max_verticality"]
 
         heels_lifted = rep_data["heels_lifted"]
@@ -256,12 +259,15 @@ def analyse_squat(landmarks, mp_pose, reps, state, rep_data, rep_feedback_blocks
             depth_result = "Not clearly detected"
 
         # ---------------- THIGHS  ----------------
-        if min_thigh >= 160:
-            thigh_result = "Great range of motion"
-        elif min_thigh >= 100:
-            thigh_result = "Needs lower"
+        max_thigh = rep_data["max_thigh_angle"]
+        if max_thigh >= 90:
+            thigh_result = "Thighs are bellow parallel"
+        elif max_thigh >= 75:
+            thigh_result = "Great range or motion. Thigs are parallel to the ground"
+        elif max_thigh >= 55:
+            thigh_result = "Thigs are slightly above parallel"
         else:
-            thigh_result = "Not detected"
+            thigh_result = "Not reaching parallel"
 
         # ---------------- POSTURE  ----------------
         if len(rep_data["lean_angles"]) > 0:
@@ -303,7 +309,7 @@ def analyse_squat(landmarks, mp_pose, reps, state, rep_data, rep_feedback_blocks
                 "max_depth_ratio": rep_data["max_depth_ratio"],
                 "min_knee_angle": rep_data["min_knee_angle"],
                 "lean_median": rep_lean,
-                "min_thigh_angle": rep_data["min_thigh_angle"],
+                "max_thigh_angle": rep_data["max_thigh_angle"],
                 "depth_result": depth_result,
                 "thigh_result": thigh_result,
                 "posture_result": posture_result,
