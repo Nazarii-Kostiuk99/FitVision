@@ -1,4 +1,4 @@
-from video_utility import mov_to_mp4
+from model.Utility.video_utility import mov_to_mp4
 import os
 
 input_path = "test_video.mov"  

@@ -2,9 +2,9 @@ import sys
 import cv2
 import mediapipe
 import numpy as np
-from video_utility import mov_to_mp4, preprocess_video
-from angle_calculations import calculate_angle
-from exercise_analysis import analyse_squat, get_initial_rep_data
+from Utility.angle_calculations import calculate_angle
+from exercises.squat_analysis import analyse_squat, get_initial_rep_data
+from Utility.video_utility import mov_to_mp4, preprocess_video
 
 # analyse_pushup, analyse_lunge, analyse_plank
 
@@ -159,9 +159,9 @@ def analyse_video(video_path, exercise_type):
     cv2.destroyAllWindows()
 
     # PRINT FEEDBACK ONCE PER REP (end of video)
-    print("\n==============================")
-    print("FINAL SET FEEDBACK (PER REP)")
-    print("==============================")
+    print("\n============================================================")
+    print("                 SET FEEDBACK (PER REP)")
+    print("============================================================")
 
     if len(rep_feedback_blocks) == 0:
         print("No reps detected.")
@@ -169,7 +169,7 @@ def analyse_video(video_path, exercise_type):
         for block in rep_feedback_blocks:
             print(f"\n### REP {block['rep']} ({block['side']}) ###")
             for line in block["feedback"]:
-                print(f"• {line}")
+                print(f" - {line}")
 
 
 # entry point
