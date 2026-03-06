@@ -2,8 +2,13 @@ import sys
 import cv2
 import mediapipe
 import numpy as np
+import os
 from Utility.angle_calculations import calculate_angle
-from exercises.squat_analysis import analyse_squat, get_initial_rep_data
+from exercises.squat_analysis import analyse_squat, get_initial_squat_rep_data
+from exercises.pushup_analysis import (
+    analyse_pushup,
+    get_initial_pushup_rep_data,
+)  # Add this
 from Utility.video_utility import mov_to_mp4, preprocess_video
 
 # analyse_pushup, analyse_lunge, analyse_plank
@@ -19,11 +24,23 @@ def analyse_video(video_path, exercise_type):
         print(f"Exercise '{exercise_type}' not supported yet")
         return
 
+    base_name = os.path.splitext(os.path.basename(video_path))[0]
+
     video_path = preprocess_video(video_path)  # mov(iphone format) -> mp4
+    output_dir = "outputs"
+    os.makedirs(output_dir, exist_ok=True)
+    output_filename = os.path.join(output_dir, f"{base_name}_analysis.mp4")
 
     reps = 0
     state = "up"
-    rep_data = get_initial_rep_data()
+
+    if exercise_type == "squat":
+        rep_data = get_initial_squat_rep_data()
+    elif exercise_type == "pushup":
+        rep_data = get_initial_pushup_rep_data()
+    else:
+        rep_data = {}
+
     rep_feedback_blocks = []
 
     mp_pose = mediapipe.solutions.pose
@@ -39,7 +56,7 @@ def analyse_video(video_path, exercise_type):
 
     # writer output logic
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    out = cv2.VideoWriter("exercise_output.mp4", fourcc, fps, (width, height))
+    out = cv2.VideoWriter(output_filename, fourcc, fps, (width, height))
 
     pose = mp_pose.Pose(
         min_detection_confidence=0.5, min_tracking_confidence=0.5
@@ -91,17 +108,55 @@ def analyse_video(video_path, exercise_type):
                     landmarks, mp_pose, reps, state, rep_data, rep_feedback_blocks
                 )
 
+                cv2.rectangle(
+                    frame, (width - 320, 10), (width - 10, 260), (0, 0, 0), -1
+                )
+                debug_stats = [
+                    (f"State: {state}", (255, 0, 255)),
+                    (f"CUR Depth: {depth_ratio:.2f}", (0, 255, 0)),
+                    (f"MAX Depth: {rep_data['max_depth_ratio']:.2f}", (0, 255, 255)),
+                    (f"CUR Knee: {int(angle)}", (0, 255, 0)),
+                    (f"MIN Knee: {int(rep_data['min_knee_angle'])}", (0, 255, 255)),
+                    (f"Lean (deg): {lean_angle:.1f}", (0, 255, 255)),
+                    (f"Heel Lift: {heel_lifted_current}", (0, 255, 255)),
+                ]
+
+            if exercise_type == "pushup":
+                (
+                    summary,
+                    angle,
+                    feedback,
+                    color,
+                    label,
+                    side,
+                    angles,
+                    depth_ratio,
+                    reps,
+                    state,
+                    rep_data,
+                    rep_feedback_blocks,
+                    shoulder_offset_current,
+                    body_angle,
+                    neck_angle,
+                    cur_min_body,
+                    cur_max_body,
+                ) = analyse_pushup(
+                    landmarks, mp_pose, reps, state, rep_data, rep_feedback_blocks
+                )
+
+                debug_stats = [
+                    (f"State: {state}", (255, 0, 255)),
+                    (f"CUR Elbow: {int(angle)}", (0, 255, 0)),
+                    (f"MIN Elbow: {int(rep_data['min_elbow_angle'])}", (0, 255, 255)),
+                    (f"Body Ang: {int(body_angle)}", (0, 255, 255)),
+                    (f"Min Body: {int(cur_min_body)}", (0, 255, 0)),
+                    (f"Max Body: {int(cur_max_body)}", (0, 255, 0)),
+                    (f"S-Offset: {shoulder_offset_current:.2f}", (0, 255, 255)),
+                    (f"CUR Neck: {int(neck_angle)}", (0, 255, 0)),
+                ]
+
             # --- DEBUG PANEL ---
-            cv2.rectangle(frame, (width - 320, 10), (width - 10, 260), (0, 0, 0), -1)
-            debug_stats = [
-                (f"State: {state}", (255, 0, 255)),
-                (f"CUR Depth: {depth_ratio:.2f}", (0, 255, 0)),
-                (f"MAX Depth: {rep_data['max_depth_ratio']:.2f}", (0, 255, 255)),
-                (f"CUR Knee: {int(angle)}", (0, 255, 0)),
-                (f"MIN Knee: {int(rep_data['min_knee_angle'])}", (0, 255, 255)),
-                (f"Lean (deg): {lean_angle:.1f}", (0, 255, 255)),
-                (f"Heel Lift: {heel_lifted_current}", (0, 255, 255)),
-            ]
+
             for i, (text, col) in enumerate(debug_stats):
                 cv2.putText(
                     frame,

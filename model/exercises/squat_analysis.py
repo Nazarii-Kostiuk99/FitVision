@@ -13,8 +13,8 @@ import statistics
 ############################################# SQUAT ANALYSIS ################################################
 
 
-# repetition data for feeback generation, tracker to be reset after each rep
-def get_initial_rep_data():
+# stores per-rep tracking data ->  Reset after every completed rep
+def get_initial_squat_rep_data():
     return {
         "max_depth_ratio": 0,
         "min_knee_angle": 999,
@@ -287,7 +287,7 @@ def analyse_squat(landmarks, mp_pose, reps, state, rep_data, rep_feedback_blocks
         )
 
         # reset for next rep
-        rep_data = get_initial_rep_data()
+        rep_data = get_initial_squat_rep_data()
 
     ####################### PER-FRAME DISPLAY FEEDBACK ########################
 
