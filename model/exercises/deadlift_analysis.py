@@ -1,17 +1,14 @@
 """
 Deadlift
 
-Counter = hip hinge angle (shoulder → hip → knee)
+Counter = hip hinge angle (shoulder - hip - knee)
 Spine curve --> SpinePose framework based on additional 9-points (perpendicular-deviation method)
 Key metrics: bar path, knee lockout, tempo
 
 SpinePose keypoint indices (top --> bottom):
-    36 = neck_03   C1          (top of cervical spine)
-    35  neck_02   C3/C4
-    18  neck      C7          (cervicothoracic junction)
-    30  spine_05  T3          (upper thoracic)
-    29  spine_04  T8          (mid thoracic)
-    28  spine_03  T12/L1      (thoracolumbar junction)
+    30  spine_05  T3
+    29  spine_04  T8
+    28  spine_03  T12/L1
     27  spine_02  L3
     26  spine_01  L5
     19  hip       sacrum      (base of spine)
@@ -20,20 +17,17 @@ SpinePose keypoint indices (top --> bottom):
 from Utility.angle_calculations import calculate_angle, angle_to_vertical_degrees
 import numpy as np
 
-# SpinePose indices anatomical order (C1 → sacrum)
-SPINE_IDS = [36, 35, 18, 30, 29, 28, 27, 26, 19]
+SPINE_IDS = [30, 29, 28, 27, 26, 19]  # T3, T8, T12/L1, L3, L5, sacrum
 
-# Minimum confidence score to trust a SpinePose keypoint
+# Minimum confidence to trust a point
 SPINE_CONFIDENCE_THRESHOLD = 0.3
 
-# Minimum MediaPipe landmark visibility to trust for state machine updates.
-# Frames where any key landmark falls below this are skipped — they don't
-# advance the state machine or update accumulators (display only).
+# Minimum landmark visibility to trust for up/down update, if smaller - skip frame
+
 LANDMARK_VISIBILITY_THRESHOLD = 0.5
 
-# Exponential moving average smoothing factor for landmark positions.
-# Higher = more responsive but jitterier; lower = smoother but laggier.
-EMA_ALPHA = 0.4
+
+EMA_ALPHA = 0.3  # smoothing factor, bigger = more jitter but responsive
 
 
 # per-rep tracking data ->  Reset after every completed rep
@@ -46,7 +40,7 @@ def get_initial_deadlift_rep_data():
         "knee_angle_at_top": None,  # knee angle on down --> up transition (lockout)
         "rep_start_time": None,
         "rep_end_time": None,
-        "valid": False,  # True after hip_angle < 90
+        "valid": False,  # True after hip angle < 90
         # EMA-smoothed landmark positions — persisted across frames to reduce jitter
         "smooth_shoulder": None,
         "smooth_hip": None,
@@ -91,24 +85,16 @@ def detect_side(landmarks, mp_pose):
 # 0.0 = perfectly straight, larger values = more curved
 def compute_spine_curvature(spine_points):
     """
-    Returns
-    -------
-    float
+    For every intermediate point, compute its perpendicular distance to that line using the 2-D cross-product formula:
+      distance = |AB × AP| / |AB|
+      where AB = sacrum - T3, AP = point - T3 (most top).
 
+       MEAN distance across all  vertebras.
 
-    How it works
-    ------------
-    1.  Draw the straight reference line from C1 (top) to sacrum (bottom).
-    2.  For every intermediate point, compute its perpendicular distance to
-        that line using the 2-D cross-product formula:
-            distance = |AB × AP| / |AB|
-        where AB = sacrum - C1, AP = point - C1.
-    3.  Take the maximum distance across all intermediate vertebrae.
-    4.  Divide by spine length so the result is scale-independent (works
-        regardless of how close the camera is to the subject).
+      Normalised by dividing by spine length so the result is scale-independent.
     """
     pts = np.array(spine_points, dtype=float)
-    top = pts[0]  # C1
+    top = pts[0]  # T3
     bottom = pts[-1]  # sacrum
 
     spine_vec = bottom - top  # AB
@@ -117,29 +103,21 @@ def compute_spine_curvature(spine_points):
     if spine_len < 1e-6:
         return 0.0
 
-    max_dev = 0.0
-    for pt in pts[1:-1]:  # intermediate vertebrae only
+    deviations = []
+    for pt in pts[1:-1]:  # intermediate vertebras only
         ap = pt - top  # AP
         # 2-D cross product magnitude = |AB_x * AP_y  -  AB_y * AP_x|
         cross = abs(spine_vec[0] * ap[1] - spine_vec[1] * ap[0])
-        perp_dist = cross / spine_len
-        max_dev = max(max_dev, perp_dist)
+        deviations.append(cross / spine_len)
 
-    return (
-        max_dev / spine_len
-    )  # max perpendicular deviation of  vertebra from the C1-to-sacrum straight line, normalised by spine length.
+    # mean deviation normalised by spine length
+    return float(np.mean(deviations)) / spine_len
 
 
 def _extract_spine_points(spine_keypoints, spine_scores, frame_width, frame_height):
     """
-
-    SpinePose returns keypoints in pixel coordinates; we normalise to [0, 1]
-    so the curvature value is consistent with the rest of the pipeline which
-    works in MediaPipe's normalised coordinate space.
-
-    Returns None if any required keypoint falls below the confidence threshold,
-    so that unreliable frames are silently skipped rather than corrupting the
-    curvature accumulator.
+    spinepose gives pixel coords, we normalise to [0,1] to match mediapipe space.
+    returns None if any point is below confidence threshold — bad frames just get skipped.
     """
     points = []
     for idx in SPINE_IDS:
@@ -157,15 +135,15 @@ def _extract_spine_points(spine_keypoints, spine_scores, frame_width, frame_heig
 def analyse_deadlift(
     landmarks,
     mp_pose,
-    spine_keypoints,  # np.ndarray shape (37, 2) pixel coords, or None
-    spine_scores,  # np.ndarray shape (37,)  confidence,   or None
+    spine_keypoints,  # np.ndarray shape (37, 2) coords or None
+    spine_scores,  # np.ndarray shape (37,)  confidence   or None
     frame_width,
     frame_height,
     reps,
     state,
     rep_data,
     rep_feedback_blocks,
-    video_timestamp=0.0,  # seconds
+    video_timestamp=0.0,  # sec
 ):
     """
     Called once per frame from the main video loop.
@@ -323,9 +301,9 @@ def analyse_deadlift(
             # ------------------ hip hinge depth ------------------
             min_hip = rep_data["min_hip_angle"]
 
-            if min_hip < 70:
+            if min_hip < 50:
                 hinge_result = "Full depth"
-            elif min_hip <= 85:
+            elif min_hip <= 65:
                 hinge_result = "Good depth"
                 score -= 10
             else:
@@ -335,13 +313,13 @@ def analyse_deadlift(
             # ------------------ spine curvature (SpinePose) ------------------
             # Mean normalised perpendicular deviation across all reliable down-phase
             # frames.  Thresholds were derived empirically; a flat conventional
-            # deadlift bottom position typically yields values < 0.05.
+            # deadlift bottom position typically yields values < z.
             if rep_data["spine_curvatures"]:
                 mean_curv = float(np.mean(rep_data["spine_curvatures"]))
 
-                if mean_curv < 0.05:
+                if mean_curv < 0.03:
                     spine_result = "Neutral spine"
-                elif mean_curv < 0.10:
+                elif mean_curv < 0.25:
                     spine_result = "Slight rounding"
                     score -= 15
                 else:
@@ -370,7 +348,7 @@ def analyse_deadlift(
 
             # ------------------ knee lockout ------------------
             knee_top = rep_data["knee_angle_at_top"]
-            if knee_top is not None and knee_top > 160:
+            if knee_top is not None and knee_top > 155:
                 lockout_result = "Locked out"
             else:
                 lockout_result = "Not fully locked"
@@ -418,7 +396,7 @@ def analyse_deadlift(
             feedback_lines.append(f"Hinge depth: {hinge_result}")
             feedback_lines.append(f"Spine: {spine_result}")
             feedback_lines.append(f"Bar path: {bar_result}")
-            feedback_lines.append(f"Lockout: {lockout_result}")
+            feedback_lines.append(f"Knees lockout: {lockout_result}")
             feedback_lines.append(f"Tempo: {tempo_result}")
 
         rep_feedback_blocks.append(

@@ -16,7 +16,6 @@ Criteria:
 
 from Utility.angle_calculations import calculate_angle
 import statistics
-import time
 import numpy as np
 
 
@@ -28,6 +27,7 @@ def get_initial_pushup_rep_data():
         "body_angles": [],
         "hip_positions": [],
         "shoulder_offsets": [],
+        "neck_angles": [],
         "rep_start_time": None,
         "rep_end_time": None,
         "valid": False,
@@ -65,7 +65,7 @@ def detect_side(landmarks, mp_pose):
         return "right"
 
 
-def analyse_pushup(landmarks, mp_pose, reps, state, rep_data, rep_feedback_blocks):
+def analyse_pushup(landmarks, mp_pose, reps, state, rep_data, rep_feedback_blocks, video_timestamp=0.0):
 
     # settings side after detection
     if rep_data["side"] is None:
@@ -124,7 +124,7 @@ def analyse_pushup(landmarks, mp_pose, reps, state, rep_data, rep_feedback_block
     # TOP POSITION
     if elbow_angle > 160:
         if state == "down":
-            rep_data["rep_end_time"] = time.time()
+            rep_data["rep_end_time"] = video_timestamp
             rep_finished = True
 
         state = "up"
@@ -132,7 +132,7 @@ def analyse_pushup(landmarks, mp_pose, reps, state, rep_data, rep_feedback_block
     # BOTTOM POSITION
     elif elbow_angle < 140:
         if state == "up":
-            rep_data["rep_start_time"] = time.time()
+            rep_data["rep_start_time"] = video_timestamp
             rep_data["hip_y_start"] = hip.y
         state = "down"
 
@@ -147,6 +147,7 @@ def analyse_pushup(landmarks, mp_pose, reps, state, rep_data, rep_feedback_block
         rep_data["body_angles"].append(body_angle)
         rep_data["hip_positions"].append(hip.y)
         rep_data["shoulder_offsets"].append(shoulder_offset_norm)
+        rep_data["neck_angles"].append(neck_angle)
 
         # mark valid only once we reach meaningful depth
         if elbow_angle < 120:
@@ -234,7 +235,8 @@ def analyse_pushup(landmarks, mp_pose, reps, state, rep_data, rep_feedback_block
                 score -= 20
 
             # ------------------ neck ------------------
-            if 115 <= neck_angle <= 155:
+            avg_neck = float(np.mean(rep_data["neck_angles"])) if rep_data["neck_angles"] else neck_angle
+            if 115 <= avg_neck <= 155:
                 neck_result = "Neutral"
             else:
                 neck_result = "Misaligned"
@@ -294,8 +296,9 @@ def analyse_pushup(landmarks, mp_pose, reps, state, rep_data, rep_feedback_block
             }
         )
 
-        # reset for next rep
+        # reset for next rep, keep side so it doesnt re-detect every rep
         rep_data = get_initial_pushup_rep_data()
+        rep_data["side"] = side_detected
 
     ################################ RETURN ###############################
 
