@@ -37,10 +37,12 @@ def _build_set_prompt(exercise_type, rep_feedback_blocks):
         f"A user just completed a set of {exercise_type}s. "
         f"Here are the automatically measured results for each rep:\n"
         f"{reps_str}\n"
-        f"Give a short overall summary of the set (2-3 sentences). "
+        f"Give feedback covering every aspect that appears in the results above — both good and bad. "
+        f"For each aspect, comment on whether it was done well or needs improvement. "
         f"Mention the specific rep numbers where issues occurred and what the issue was. "
-        f"If the same issue appears in multiple reps, group them together (e.g. 'reps 3, 5 and 7'). "
-        f"End with a sentence on the overall quality of the set. "
+        f"Also mention the specific rep numbers where something was done well. "
+        f"If the same feedback applies to multiple reps, group them (e.g. 'reps 3, 5 and 7'). "
+        f"End with an overall summary of the set quality. "
         f"Be encouraging but honest. No jargon. Do not repeat scores or numbers from the metrics."
     )
     return prompt

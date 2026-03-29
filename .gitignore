@@ -8,9 +8,10 @@ __pycache__/
 *.pyo
 *.pyd
 
-# Virtual environments
+# Virtual 
 venv/
 venv_ai/
+venv-model/
 venv_django/
 */venv/
 */venv_*/

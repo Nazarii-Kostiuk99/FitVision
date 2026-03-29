@@ -42,7 +42,7 @@ def anonymise_video(input_video_path):
     allowed_no_face_frames = 60
 
     mp_face = mediapipe.solutions.face_detection
-    detector = mp_face.FaceDetection(model_selection=1, min_detection_confidence=0.5)
+    detector = mp_face.FaceDetection(model_selection=1, min_detection_confidence=0.3)
 
     cap = cv2.VideoCapture(input_video_path)
     if not cap.isOpened():
