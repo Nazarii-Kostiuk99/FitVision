@@ -15,6 +15,7 @@ from exercises.deadlift_analysis import (
     EMA_ALPHA,
 )
 from Utility.video_utility import mov_to_mp4, preprocess_video
+from feedback_generation.llm_feedback import generate_set_feedback
 
 # only import spinepose if its installed, dont want it crashing for other exercises
 try:
@@ -254,7 +255,13 @@ def analyse_video(video_path, exercise_type):
                     cur_min_body,
                     cur_max_body,
                 ) = analyse_pushup(
-                    landmarks, mp_pose, reps, state, rep_data, rep_feedback_blocks, video_ts
+                    landmarks,
+                    mp_pose,
+                    reps,
+                    state,
+                    rep_data,
+                    rep_feedback_blocks,
+                    video_ts,
                 )
 
                 debug_stats = [
@@ -457,6 +464,13 @@ def analyse_video(video_path, exercise_type):
             print(f"\n### REP {block['rep']} ({block['side']}) ###")
             for line in block["feedback"]:
                 print(f" - {line}")
+
+        # one LLM call for the whole set after all reps are printed
+        print("\n------------------------------------------------------------")
+        print("  LLM SUMMARY")
+        print("------------------------------------------------------------")
+        llm_summary = generate_set_feedback(exercise_type, rep_feedback_blocks)
+        print(f"\n{llm_summary}")
 
 
 # entry point

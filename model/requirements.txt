@@ -32,5 +32,7 @@ sentencepiece==0.2.1
 six==1.17.0
 sounddevice==0.5.2
 spinepose
+groq
+python-dotenv
 threadpoolctl==3.6.0
 tzdata==2025.2

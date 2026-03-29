@@ -36,8 +36,10 @@ def anonymise_video(input_video_path):
 
     # for consistent blur box when lost track of face frames
     last_bbox = None
+    smooth_bbox = None  # EMA bbox to reduce jitter when face is detected
+    ema_alpha = 0.3  # higher = more responsive, lower = smoother
     no_face_frames = 0
-    allowed_no_face_frames = 10
+    allowed_no_face_frames = 60
 
     mp_face = mediapipe.solutions.face_detection
     detector = mp_face.FaceDetection(model_selection=1, min_detection_confidence=0.5)
@@ -76,12 +78,20 @@ def anonymise_video(input_video_path):
             x2, y2 = min(width, x2), min(height, y2)
 
             current_bbox = (x1, y1, x2, y2)
-            last_bbox = current_bbox
+            # EMA smooth the bbox so it doesnt snap between positions
+            if smooth_bbox is None:
+                smooth_bbox = current_bbox
+            else:
+                smooth_bbox = tuple(
+                    int(ema_alpha * c + (1 - ema_alpha) * s)
+                    for c, s in zip(current_bbox, smooth_bbox)
+                )
+            last_bbox = smooth_bbox
             no_face_frames = 0
         else:
             no_face_frames += 1
 
-        # use last calculated box if no face frames for 5 frames (avoids flcikering of bbox)
+        # use last known box for up to allowed_no_face_frames frames
         if last_bbox and no_face_frames < allowed_no_face_frames:
             x1, y1, x2, y2 = last_bbox
             face = frame[y1:y2, x1:x2]
