@@ -298,18 +298,10 @@ def analyse_squat(landmarks, mp_pose, reps, state, rep_data, rep_feedback_blocks
         primary_feedback = "Ready"
         colour = (255, 255, 255)
 
-    display_angle = knee_angle
-    label = "Knee Angle"
-
-    # only shows 1 line overlay summary
-    summary = [f"State: {state}"]
-
     return (
-        summary,
-        display_angle,
+        knee_angle,
         primary_feedback,
         colour,
-        label,
         side,
         angles,
         depth_ratio,

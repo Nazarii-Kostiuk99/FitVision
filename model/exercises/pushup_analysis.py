@@ -308,11 +308,9 @@ def analyse_pushup(landmarks, mp_pose, reps, state, rep_data, rep_feedback_block
     }
 
     return (
-        "",  # summary
         elbow_angle,
         "Pushup analysis",
         (0, 255, 255),
-        "",
         side_label,
         angles,
         rep_data["min_elbow_angle"],

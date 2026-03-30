@@ -116,8 +116,8 @@ def compute_spine_curvature(spine_points):
 
 def _extract_spine_points(spine_keypoints, spine_scores, frame_width, frame_height):
     """
-    spinepose gives pixel coords, we normalise to [0,1] to match mediapipe space.
-    returns None if any point is below confidence threshold — bad frames just get skipped.
+    spinepose gives pixel coords + normalise to [0,1] to match mediapipe space.
+    None if any point is < confidence threshold (skip bad frames)
     """
     points = []
     for idx in SPINE_IDS:
@@ -146,12 +146,10 @@ def analyse_deadlift(
     video_timestamp=0.0,  # sec
 ):
     """
-    Called once per frame from the main video loop.
+   
 
-    MediaPipe = state machine, bar-path tracking, knee-lockout check, timing.
-    SpinePose = spine curvature metric. If SpinePose returns None for a frame
-    the curvature accumulator simply receives no entry for that frame, and
-    the mean is taken over whatever frames were reliable.
+    MediaPipe = state machine, bar-path tracking, knee-lockout check, time.
+    SpinePose = spine curvature metric. 
     """
 
     # settings side after detection
@@ -175,17 +173,14 @@ def analyse_deadlift(
         wrist = landmarks[mp_pose.PoseLandmark.RIGHT_WRIST.value]
         side_label = "Right"
 
-    # ── visibility gate ─────────────────────────────────────────────────────────
-    # Check reliability BEFORE EMA so we don't feed bad positions into the smoother.
+    # ── visibility  ─────────────────────────────────────────────────────────
     landmarks_reliable = all(
         lm.visibility >= LANDMARK_VISIBILITY_THRESHOLD
         for lm in [shoulder, hip, knee, ankle]
     )
 
     # ── EMA smoothing ──────────────────────────────────────────────────────────
-    # Only update smoothed positions on reliable frames. On occluded frames the
-    # smoother is frozen at the last good value — preventing the barbell plate
-    # from gradually pulling landmark positions to wrong locations.
+    # Only smoothes reliable frames
     def _ema(prev, new_val):
         if prev is None:
             return new_val
@@ -215,14 +210,10 @@ def analyse_deadlift(
 
     ################################ ANGLE CALCULATIONS ###############################
 
-    # Primary state-machine angle.
-    # Standing (~170-180°)  →  bottom of deadlift (~60-90°).
     hip_angle = calculate_angle(shoulder_coords, hip_coords, knee_coords)
 
-    # Knee angle for lockout check at the top.
     knee_angle = calculate_angle(hip_coords, knee_coords, ankle_coords)
 
-    # Torso lean (back angle) — supplementary debug metric.
     back_angle = angle_to_vertical_degrees(hip_coords, shoulder_coords)
 
     # Torso length for bar-path normalisation.
@@ -311,9 +302,7 @@ def analyse_deadlift(
                 score -= 30
 
             # ------------------ spine curvature (SpinePose) ------------------
-            # Mean normalised perpendicular deviation across all reliable down-phase
-            # frames.  Thresholds were derived empirically; a flat conventional
-            # deadlift bottom position typically yields values < z.
+            # how much spine curves away form staright line during lowest point
             if rep_data["spine_curvatures"]:
                 mean_curv = float(np.mean(rep_data["spine_curvatures"]))
 
@@ -326,12 +315,10 @@ def analyse_deadlift(
                     spine_result = "Significant rounding"
                     score -= 30
             else:
-                # SpinePose had insufficient confidence across the whole rep
                 spine_result = "Not detected"
 
             # ------------------ bar path ------------------
             # Lateral wrist drift normalised by torso length.
-            # Ideally the bar traces a near-vertical path close to the body.
             wx = rep_data["wrist_x_positions"]
             bar_drift = (
                 (max(wx) - min(wx)) / torso_length if wx and torso_length > 0 else 0
@@ -360,7 +347,7 @@ def analyse_deadlift(
                 if rep_data["rep_start_time"]
                 else 0
             )
-            if rep_time < 0.8:
+            if rep_time < 1.0:
                 tempo_result = "Too fast"
                 score -= 12
             elif rep_time > 5.0:
@@ -407,8 +394,7 @@ def analyse_deadlift(
             }
         )
 
-        # reset for next rep, preserving locked side and EMA state so smoothing
-        # doesn't restart from None at the beginning of every rep
+        # reset for next rep, preservs locked side + EMA state so smoothing
         smooth_state = {
             k: rep_data[k]
             for k in (
@@ -431,21 +417,19 @@ def analyse_deadlift(
     }
 
     return (
-        "",  # summary (unused slot, consistent with other analysers)
-        hip_angle,  # primary display angle
-        "Deadlift analysis",  # feedback label
+        hip_angle,
+        "Deadlift analysis",
         (0, 165, 255),  # orange — distinct from squat (green) and pushup (cyan)
-        "",  # label (unused)
         side_label,
         angles,
-        knee_angle,  # secondary angle slot
+        knee_angle,
         reps,
         state,
         rep_data,
         rep_feedback_blocks,
-        back_angle,  # debug
-        knee_angle,  # debug
-        cur_min_hip,  # debug
-        cur_spine_curv,  # debug
-        cur_bar_drift,  # debug
+        back_angle,
+        knee_angle,
+        cur_min_hip,
+        cur_spine_curv,
+        cur_bar_drift,
     )

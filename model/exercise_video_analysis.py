@@ -37,20 +37,20 @@ except ImportError:
     print("WARNING: spinepose not installed — deadlift spine curvature will be skipped.")
 
 
-def analyse_video(video_path, exercise_type):
+def analyse_video(video_path, exercise_type, output_dir="outputs"):
     """
     Supported: squat, pushup, deadlift
-    Exercise selected by user, parsed to backend + called by django
+    Exercise selected by user, parsed to backend + called by django.
+    Returns a dict with rep_feedback, llm_summary, total_reps, output_video_path.
     """
 
     if exercise_type not in ["squat", "pushup", "deadlift", "lunge", "plank"]:
         print(f"Exercise '{exercise_type}' not supported yet")
-        return
+        return None
 
     base_name = os.path.splitext(os.path.basename(video_path))[0]
 
     video_path = preprocess_video(video_path)  # mov (iPhone format) -> anonymised mp4
-    output_dir = "outputs"
     os.makedirs(output_dir, exist_ok=True)
     output_filename = os.path.join(output_dir, f"{base_name}_analysis.mp4")
 
@@ -127,10 +127,10 @@ def analyse_video(video_path, exercise_type):
             lms = results.pose_landmarks.landmark
             xs = [lm.x * width for lm in lms]
             ys = [lm.y * height for lm in lms]
-            x1 = max(0, int(min(xs)) - 200)
-            y1 = max(0, int(min(ys)) - 200)
-            x2 = min(width, int(max(xs)) + 200)
-            y2 = min(height, int(max(ys)) + 200)
+            x1 = max(0, int(min(xs)) - 150)
+            y1 = max(0, int(min(ys)) - 150)
+            x2 = min(width, int(max(xs)) + 150)
+            y2 = min(height, int(max(ys)) + 150)
 
             small = cv2.resize(frame, (width // 2, height // 2))
             bbox = np.array([[x1 // 2, y1 // 2, x2 // 2, y2 // 2]], dtype=np.float32)
@@ -195,7 +195,7 @@ def analyse_video(video_path, exercise_type):
 
             if exercise_type == "squat":
                 (
-                    _, angle, feedback, color, _, side, angles,
+                    angle, feedback, color, side, angles,
                     depth_ratio, reps, state, rep_data, rep_feedback_blocks,
                     heel_lifted_current, lean_angle,
                 ) = analyse_squat(landmarks, mp_pose, reps, state, rep_data, rep_feedback_blocks)
@@ -213,7 +213,7 @@ def analyse_video(video_path, exercise_type):
 
             if exercise_type == "pushup":
                 (
-                    _, angle, feedback, color, _, side, angles,
+                    angle, feedback, color, side, angles,
                     depth_ratio, reps, state, rep_data, rep_feedback_blocks,
                     shoulder_offset_current, body_angle, neck_angle,
                     cur_min_body, cur_max_body,
@@ -232,7 +232,7 @@ def analyse_video(video_path, exercise_type):
 
             if exercise_type == "deadlift":
                 (
-                    _, angle, feedback, color, _, side, angles,
+                    angle, feedback, color, side, angles,
                     knee_angle_cur, reps, state, rep_data, rep_feedback_blocks,
                     back_angle, knee_angle_cur, cur_min_hip, cur_spine_curv, cur_bar_drift,
                 ) = analyse_deadlift(
@@ -318,6 +318,7 @@ def analyse_video(video_path, exercise_type):
     print("                 SET FEEDBACK (PER REP)")
     print("============================================================")
 
+    llm_summary = ""
     if len(rep_feedback_blocks) == 0:
         print("No reps detected.")
     else:
@@ -332,10 +333,17 @@ def analyse_video(video_path, exercise_type):
         llm_summary = generate_set_feedback(exercise_type, rep_feedback_blocks)
         print(f"\n{llm_summary}")
 
+    return {
+        "total_reps": reps,
+        "rep_feedback": rep_feedback_blocks,
+        "llm_summary": llm_summary,
+        "output_video_path": output_filename,
+    }
+
 
 if __name__ == "__main__":
     if len(sys.argv) > 2:
         analyse_video(sys.argv[1], sys.argv[2])
     else:
-        print("Usage: python exercise_video_analysis.py <video_path> <exercise>")
+        print("python exercise_video_analysis.py <video_path> <exercise>")
         print("Exercises: squat, pushup, deadlift")

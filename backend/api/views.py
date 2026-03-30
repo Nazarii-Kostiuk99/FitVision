@@ -1,3 +1,148 @@
-from django.shortcuts import render
+import os
+from django.conf import settings
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.permissions import AllowAny
+from rest_framework_simplejwt.tokens import RefreshToken
 
-# Create your views here.
+from .models import Analysis
+from .serializers import AnalysisSerializer, RegisterSerializer, UserSerializer
+
+SUPPORTED_EXERCISES = ['squat', 'pushup', 'deadlift']
+
+
+class RegisterView(APIView):
+    """
+    POST /api/auth/register/
+    Body: { username, email, password }
+    Returns JWT tokens and the new user object.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = RegisterSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        user = serializer.save()
+        refresh = RefreshToken.for_user(user)
+        return Response({
+            'user': UserSerializer(user).data,
+            'access': str(refresh.access_token),
+            'refresh': str(refresh),
+        }, status=status.HTTP_201_CREATED)
+
+
+class MeView(APIView):
+    """
+    GET /api/auth/me/
+    Returns the current authenticated user's profile.
+    """
+
+    def get(self, request):
+        return Response(UserSerializer(request.user).data)
+
+
+class AnalyseView(APIView):
+    """
+    POST /api/analyse/
+    Body: multipart/form-data with 'video' (file) and 'exercise_type' (string)
+
+    Saves the uploaded video, runs the full CV + LLM pipeline synchronously,
+    saves results to the DB, and returns the complete analysis.
+
+    Note: processing can take 1-5 minutes depending on video length and hardware.
+    The mobile app should show a loading state while waiting.
+    """
+
+    def post(self, request):
+        video_file = request.FILES.get('video')
+        exercise_type = request.data.get('exercise_type', '').lower().strip()
+
+        if not video_file:
+            return Response({'error': 'No video file provided.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if exercise_type not in SUPPORTED_EXERCISES:
+            return Response(
+                {'error': f"Invalid exercise type. Supported: {', '.join(SUPPORTED_EXERCISES)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Save the record immediately so we have an ID, status starts as 'processing'
+        analysis = Analysis.objects.create(
+            user=request.user,
+            exercise_type=exercise_type,
+            input_video=video_file,
+        )
+
+        try:
+            # Import here so Django can start without the model venv packages installed
+            from exercise_video_analysis import analyse_video
+
+            output_dir = str(settings.MEDIA_ROOT / 'outputs')
+
+            result = analyse_video(
+                video_path=analysis.input_video.path,
+                exercise_type=exercise_type,
+                output_dir=output_dir,
+            )
+
+            if result is None:
+                raise ValueError(f"Exercise '{exercise_type}' is not fully implemented yet.")
+
+            # Store the output video path relative to MEDIA_ROOT so Django's
+            # FileField can build the correct URL later
+            output_abs = result['output_video_path']
+            output_rel = os.path.relpath(output_abs, settings.MEDIA_ROOT)
+
+            # Delete the raw input video — the output already has face blur applied,
+            # so keeping the original would defeat the purpose of anonymisation
+            raw_path = analysis.input_video.path
+            analysis.input_video.delete(save=False)
+            if os.path.exists(raw_path):
+                os.remove(raw_path)
+
+            analysis.output_video = output_rel
+            analysis.rep_feedback = result['rep_feedback']
+            analysis.llm_summary = result['llm_summary']
+            analysis.total_reps = result['total_reps']
+            analysis.status = 'complete'
+            analysis.save()
+
+        except Exception as e:
+            analysis.status = 'failed'
+            analysis.error_message = str(e)
+            analysis.save()
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        serializer = AnalysisSerializer(analysis, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class AnalysisDetailView(APIView):
+    """
+    GET /api/analysis/<id>/
+    Returns a single analysis by ID — only if it belongs to the current user.
+    """
+
+    def get(self, request, pk):
+        try:
+            analysis = Analysis.objects.get(pk=pk, user=request.user)
+        except Analysis.DoesNotExist:
+            return Response({'error': 'Analysis not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = AnalysisSerializer(analysis, context={'request': request})
+        return Response(serializer.data)
+
+
+class AnalysisListView(APIView):
+    """
+    GET /api/analyses/
+    Returns all analyses for the current user, most recent first.
+    """
+
+    def get(self, request):
+        analyses = Analysis.objects.filter(user=request.user).order_by('-created_at')
+        serializer = AnalysisSerializer(analyses, many=True, context={'request': request})
+        return Response(serializer.data)

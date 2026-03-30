@@ -1,7 +1,7 @@
 """
-Qualitative feedbakc generation usingGroq API.
+Qualitative feedbakc generation (Groq API + llama).
 
-After main pipeline produces per-rep metrics, they are sent to a
+After main pipeline produces main metrics, they are sent to a
 small language model hosted on Groq and gets back small coash-like
 qualitative feedback
 """
