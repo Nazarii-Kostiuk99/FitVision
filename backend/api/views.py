@@ -9,15 +9,16 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from .models import Analysis
 from .serializers import AnalysisSerializer, RegisterSerializer, UserSerializer
 
-SUPPORTED_EXERCISES = ['squat', 'pushup', 'deadlift']
+SUPPORTED_EXERCISES = ["squat", "pushup", "deadlift"]
 
 
+# return :  jwt + the new user object
 class RegisterView(APIView):
     """
     POST /api/auth/register/
     Body: { username, email, password }
-    Returns JWT tokens and the new user object.
     """
+
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -27,49 +28,51 @@ class RegisterView(APIView):
 
         user = serializer.save()
         refresh = RefreshToken.for_user(user)
-        return Response({
-            'user': UserSerializer(user).data,
-            'access': str(refresh.access_token),
-            'refresh': str(refresh),
-        }, status=status.HTTP_201_CREATED)
+        return Response(
+            {
+                "user": UserSerializer(user).data,
+                "access": str(refresh.access_token),
+                "refresh": str(refresh),
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 
+# return : current authenticated user profile
 class MeView(APIView):
     """
     GET /api/auth/me/
-    Returns the current authenticated user's profile.
     """
 
     def get(self, request):
         return Response(UserSerializer(request.user).data)
 
 
+#  Save uploaded video + runs full pipeline + save back to DB +  return the complete analysis
 class AnalyseView(APIView):
     """
     POST /api/analyse/
     Body: multipart/form-data with 'video' (file) and 'exercise_type' (string)
-
-    Saves the uploaded video, runs the full CV + LLM pipeline synchronously,
-    saves results to the DB, and returns the complete analysis.
-
-    Note: processing can take 1-5 minutes depending on video length and hardware.
-    The mobile app should show a loading state while waiting.
     """
 
     def post(self, request):
-        video_file = request.FILES.get('video')
-        exercise_type = request.data.get('exercise_type', '').lower().strip()
+        video_file = request.FILES.get("video")
+        exercise_type = request.data.get("exercise_type", "").lower().strip()
 
         if not video_file:
-            return Response({'error': 'No video file provided.'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": "No video selected"}, status=status.HTTP_400_BAD_REQUEST
+            )
 
         if exercise_type not in SUPPORTED_EXERCISES:
             return Response(
-                {'error': f"Invalid exercise type. Supported: {', '.join(SUPPORTED_EXERCISES)}"},
+                {
+                    "error": f"Invalid exercise type. Supported: {', '.join(SUPPORTED_EXERCISES)}"
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Save the record immediately so we have an ID, status starts as 'processing'
+        # Save the analysis record -> store ID, status starts as 'processing'
         analysis = Analysis.objects.create(
             user=request.user,
             exercise_type=exercise_type,
@@ -80,7 +83,7 @@ class AnalyseView(APIView):
             # Import here so Django can start without the model venv packages installed
             from exercise_video_analysis import analyse_video
 
-            output_dir = str(settings.MEDIA_ROOT / 'outputs')
+            output_dir = str(settings.MEDIA_ROOT / "outputs")
 
             result = analyse_video(
                 video_path=analysis.input_video.path,
@@ -89,11 +92,13 @@ class AnalyseView(APIView):
             )
 
             if result is None:
-                raise ValueError(f"Exercise '{exercise_type}' is not fully implemented yet.")
+                raise ValueError(
+                    f"Exercise '{exercise_type}' is not fully implemented yet."
+                )
 
             # Store the output video path relative to MEDIA_ROOT so Django's
             # FileField can build the correct URL later
-            output_abs = result['output_video_path']
+            output_abs = result["output_video_path"]
             output_rel = os.path.relpath(output_abs, settings.MEDIA_ROOT)
 
             # Delete the raw input video — the output already has face blur applied,
@@ -104,19 +109,21 @@ class AnalyseView(APIView):
                 os.remove(raw_path)
 
             analysis.output_video = output_rel
-            analysis.rep_feedback = result['rep_feedback']
-            analysis.llm_summary = result['llm_summary']
-            analysis.total_reps = result['total_reps']
-            analysis.status = 'complete'
+            analysis.rep_feedback = result["rep_feedback"]
+            analysis.llm_summary = result["llm_summary"]
+            analysis.total_reps = result["total_reps"]
+            analysis.status = "complete"
             analysis.save()
 
         except Exception as e:
-            analysis.status = 'failed'
+            analysis.status = "failed"
             analysis.error_message = str(e)
             analysis.save()
-            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(
+                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
-        serializer = AnalysisSerializer(analysis, context={'request': request})
+        serializer = AnalysisSerializer(analysis, context={"request": request})
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
@@ -130,9 +137,11 @@ class AnalysisDetailView(APIView):
         try:
             analysis = Analysis.objects.get(pk=pk, user=request.user)
         except Analysis.DoesNotExist:
-            return Response({'error': 'Analysis not found.'}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"error": "Analysis not found."}, status=status.HTTP_404_NOT_FOUND
+            )
 
-        serializer = AnalysisSerializer(analysis, context={'request': request})
+        serializer = AnalysisSerializer(analysis, context={"request": request})
         return Response(serializer.data)
 
 
@@ -143,6 +152,8 @@ class AnalysisListView(APIView):
     """
 
     def get(self, request):
-        analyses = Analysis.objects.filter(user=request.user).order_by('-created_at')
-        serializer = AnalysisSerializer(analyses, many=True, context={'request': request})
+        analyses = Analysis.objects.filter(user=request.user).order_by("-created_at")
+        serializer = AnalysisSerializer(
+            analyses, many=True, context={"request": request}
+        )
         return Response(serializer.data)

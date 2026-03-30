@@ -109,4 +109,7 @@ def anonymise_video(input_video_path):
 def preprocess_video(video_input_path):
     mp4_path = mov_to_mp4(video_input_path)
     anonymised_path = anonymise_video(mp4_path)
+    # delete the converted mp4 intermediate if input was a MOV
+    if mp4_path != video_input_path and os.path.exists(mp4_path):
+        os.remove(mp4_path)
     return anonymised_path

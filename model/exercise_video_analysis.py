@@ -314,6 +314,10 @@ def analyse_video(video_path, exercise_type, output_dir="outputs"):
     out.release()
     cv2.destroyAllWindows()
 
+    # delete the anonymised intermediate — only the final annotated output is needed
+    if os.path.exists(video_path):
+        os.remove(video_path)
+
     print("\n============================================================")
     print("                 SET FEEDBACK (PER REP)")
     print("============================================================")

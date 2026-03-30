@@ -4,28 +4,30 @@ from django.contrib.auth.models import User
 
 class Analysis(models.Model):
     EXERCISE_CHOICES = [
-        ('squat', 'Squat'),
-        ('pushup', 'Pushup'),
-        ('deadlift', 'Deadlift'),
+        ("squat", "Squat"),
+        ("pushup", "Pushup"),
+        ("deadlift", "Deadlift"),
     ]
     STATUS_CHOICES = [
-        ('processing', 'Processing'),
-        ('complete', 'Complete'),
-        ('failed', 'Failed'),
+        ("processing", "Processing"),
+        ("complete", "Complete"),
+        ("failed", "Failed"),
     ]
 
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='analyses')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="analyses")
     exercise_type = models.CharField(max_length=50, choices=EXERCISE_CHOICES)
 
-    # Deleted after processing to avoid storing unblurred footage
-    input_video = models.FileField(upload_to='uploads/', null=True, blank=True)
+    # to be deldeted later after processing, not stored in db
+    input_video = models.FileField(upload_to="uploads/", null=True, blank=True)
 
-    # The annotated output video — null until processing completes
-    output_video = models.FileField(upload_to='outputs/', null=True, blank=True)
+    # final analysis video, null untill finsihed processing
+    output_video = models.FileField(upload_to="outputs/", null=True, blank=True)
 
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='processing')
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default="processing"
+    )
 
-    # json per rep feedback from main pipeline
+    # per rep feedback main pipeline (json)
     rep_feedback = models.JSONField(default=list)
 
     # qualitative llama feedback summary
