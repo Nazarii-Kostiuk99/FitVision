@@ -12,6 +12,11 @@ export default function HomeScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
 
   async function pickVideo() {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permission required", "Please allow access to your photo library.");
+      return;
+    }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["videos"],
     });

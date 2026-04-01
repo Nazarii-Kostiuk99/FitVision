@@ -69,7 +69,7 @@ def generate_set_feedback(
                 {"role": "user", "content": prompt},
             ],
             temperature=0.7,
-            max_tokens=250,  
+            max_tokens=500,
         )
 
         return response.choices[0].message.content.strip()

@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -17,8 +17,12 @@
       "infoPlist": {
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
-        }
-      }
+        },
+        "NSPhotoLibraryUsageDescription": "Allow access to select videos for analysis.",
+        "NSCameraUsageDescription": "Allow access to record videos for analysis.",
+        "NSMicrophoneUsageDescription": "Allow access to microphone for video recording."
+      },
+      "bundleIdentifier": "com.nazarii.fitvision"
     },
     "android": {
       "adaptiveIcon": {
@@ -32,7 +36,8 @@
     },
     "plugins": [
       "expo-video",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-image-picker"
     ]
   }
 }

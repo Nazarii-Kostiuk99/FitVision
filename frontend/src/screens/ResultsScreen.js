@@ -8,6 +8,7 @@ export default function ResultsScreen({ route, navigation }) {
 
   const player = useVideoPlayer(analysis.output_video_url, (p) => {
     p.loop = true;
+    p.play();
   });
 
   return (
@@ -30,7 +31,8 @@ export default function ResultsScreen({ route, navigation }) {
         <VideoView
           player={player}
           style={{ width: "100%", height: 220, borderRadius: 10, marginBottom: 24 }}
-          fullscreenOptions={{ allowsPictureInPicture: true }}
+          nativeControls={true}
+          allowsFullscreen={true}
         />
       )}
 
