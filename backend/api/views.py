@@ -23,6 +23,7 @@ class RegisterView(APIView):
 
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
+        # pass to serialiser for validation
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -80,11 +81,12 @@ class AnalyseView(APIView):
         )
 
         try:
-            # Import here so Django can start without the model venv packages installed
+            # import here so Django can start without the model venv packages installed
             from exercise_video_analysis import analyse_video
 
             output_dir = str(settings.MEDIA_ROOT / "outputs")
 
+            # CALL TO THE MAIN PIPELINE HERE!!!!!!!!!!!!!!!!!!!!!!!
             result = analyse_video(
                 video_path=analysis.input_video.path,
                 exercise_type=exercise_type,
@@ -96,13 +98,11 @@ class AnalyseView(APIView):
                     f"Exercise '{exercise_type}' is not fully implemented yet."
                 )
 
-            # Store the output video path relative to MEDIA_ROOT so Django's
-            # FileField can build the correct URL later
+            # store the output video path relative to MEDIA_ROOT to build url later
             output_abs = result["output_video_path"]
             output_rel = os.path.relpath(output_abs, settings.MEDIA_ROOT)
 
-            # Delete the raw input video — the output already has face blur applied,
-            # so keeping the original would defeat the purpose of anonymisation
+            # delete the raw input video
             raw_path = analysis.input_video.path
             analysis.input_video.delete(save=False)
             if os.path.exists(raw_path):
@@ -127,10 +127,10 @@ class AnalyseView(APIView):
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
+# returns a single analysis that belong to logged in user by id
 class AnalysisDetailView(APIView):
     """
     GET /api/analysis/<id>/
-    Returns a single analysis by ID — only if it belongs to the current user.
     """
 
     def get(self, request, pk):
@@ -145,6 +145,7 @@ class AnalysisDetailView(APIView):
         return Response(serializer.data)
 
 
+# return all
 class AnalysisListView(APIView):
     """
     GET /api/analyses/

@@ -318,6 +318,7 @@ def analyse_video(video_path, exercise_type, output_dir="outputs"):
     if os.path.exists(video_path):
         os.remove(video_path)
 
+
     print("\n============================================================")
     print("                 SET FEEDBACK (PER REP)")
     print("============================================================")

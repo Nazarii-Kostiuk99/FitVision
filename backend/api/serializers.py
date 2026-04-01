@@ -23,7 +23,7 @@ class UserSerializer(serializers.ModelSerializer):
 class AnalysisSerializer(serializers.ModelSerializer):
     output_video_url = (
         serializers.SerializerMethodField()
-    )  # calls get_outpuy_vieo_url to compute since not a model field
+    )  # calls get_outpuy_vieo_url to compute coz not a model field
 
     class Meta:
         model = Analysis
