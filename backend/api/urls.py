@@ -16,6 +16,7 @@ urlpatterns = [
     path("auth/refresh/", TokenRefreshView.as_view()),
     path("auth/me/", MeView.as_view()),
     # exercise analysis
+    # /api
     path("analyse/", AnalyseView.as_view()),
     path("analysis/<int:pk>/", AnalysisDetailView.as_view()),
     path("analyses/", AnalysisListView.as_view()),

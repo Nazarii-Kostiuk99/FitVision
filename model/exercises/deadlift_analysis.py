@@ -418,8 +418,8 @@ def analyse_deadlift(
 
     return (
         hip_angle,
-        "Deadlift analysis",
-        (0, 165, 255),  # orange — distinct from squat (green) and pushup (cyan)
+        "",
+        (0, 165, 255), 
         side_label,
         angles,
         knee_angle,

@@ -5,17 +5,14 @@ import mediapipe
 
 """
     Utiity function to convert a video .mov to .mp4.
-    If alrdy .mp4 -> input_path.
 """
 
 
 def mov_to_mp4(input_video_path):
-    if input_video_path.lower().endswith(".mp4"):
-        return input_video_path
+    base, ext = os.path.splitext(input_video_path)
+    output_path = f"{base}_converted.mp4"
 
-    base, _ = os.path.splitext(input_video_path)
-    output_path = f"{base}.mp4"
-
+    # always re-encode so ffmpeg bakes in any rotation metadata, otherwise rotation tag ignored
     try:
         (
             ffmpeg.input(input_video_path)

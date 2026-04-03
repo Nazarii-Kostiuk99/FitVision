@@ -1,10 +1,42 @@
 import os
 from django.conf import settings
+from django.http import FileResponse, HttpResponse
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
+
+# cusotm view to serve video to dispkay properly for ios
+def serve_media(request, path):
+    file_path = os.path.join(settings.MEDIA_ROOT, path)
+    if not os.path.exists(file_path):
+        return HttpResponse(status=404)
+
+    file_size = os.path.getsize(file_path)
+    range_header = request.META.get("HTTP_RANGE")
+
+    if range_header:
+        range_val = range_header.strip().split("=")[1]
+        start, end = range_val.split("-")
+        start = int(start)
+        end = int(end) if end else file_size - 1
+        length = end - start + 1
+
+        with open(file_path, "rb") as f:
+            f.seek(start)
+            data = f.read(length)
+
+        response = HttpResponse(data, status=206, content_type="video/mp4")
+        response["Content-Range"] = f"bytes {start}-{end}/{file_size}"
+        response["Accept-Ranges"] = "bytes"
+        response["Content-Length"] = str(length)
+        return response
+
+    response = FileResponse(open(file_path, "rb"), content_type="video/mp4")
+    response["Accept-Ranges"] = "bytes"
+    response["Content-Length"] = str(file_size)
+    return response
 
 from .models import Analysis
 from .serializers import AnalysisSerializer, RegisterSerializer, UserSerializer
@@ -91,6 +123,7 @@ class AnalyseView(APIView):
                 video_path=analysis.input_video.path,
                 exercise_type=exercise_type,
                 output_dir=output_dir,
+                analysis_id=analysis.id,
             )
 
             if result is None:
