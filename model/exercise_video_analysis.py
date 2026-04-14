@@ -160,24 +160,30 @@ def analyse_video(video_path, exercise_type, output_dir="outputs", analysis_id=N
         if results.pose_landmarks:
             landmarks = results.pose_landmarks.landmark
 
-            if exercise_type in ("deadlift", "pushup"):
+            if exercise_type in ("deadlift", "pushup", "squat"):
                 # only draw the visible side — drawing both causes the back limbs to flicker
-                _side = rep_data.get("side") or "right"
-                _prefix = "LEFT" if _side == "left" else "RIGHT"
+                _side_raw = rep_data.get("side") or "right"
+                # squat returns "Right side" / "Left side", others return "right" / "left"
+                if "Left" in str(_side_raw) or _side_raw == "left":
+                    _prefix = "LEFT"
+                else:
+                    _prefix = "RIGHT"
                 _ids = {
-                    "shoulder": getattr(
-                        mp_pose.PoseLandmark, f"{_prefix}_SHOULDER"
-                    ).value,
-                    "elbow": getattr(mp_pose.PoseLandmark, f"{_prefix}_ELBOW").value,
-                    "hip": getattr(mp_pose.PoseLandmark, f"{_prefix}_HIP").value,
-                    "knee": getattr(mp_pose.PoseLandmark, f"{_prefix}_KNEE").value,
-                    "ankle": getattr(mp_pose.PoseLandmark, f"{_prefix}_ANKLE").value,
-                    "wrist": getattr(mp_pose.PoseLandmark, f"{_prefix}_WRIST").value,
+                    "shoulder":   getattr(mp_pose.PoseLandmark, f"{_prefix}_SHOULDER").value,
+                    "elbow":      getattr(mp_pose.PoseLandmark, f"{_prefix}_ELBOW").value,
+                    "hip":        getattr(mp_pose.PoseLandmark, f"{_prefix}_HIP").value,
+                    "knee":       getattr(mp_pose.PoseLandmark, f"{_prefix}_KNEE").value,
+                    "ankle":      getattr(mp_pose.PoseLandmark, f"{_prefix}_ANKLE").value,
+                    "wrist":      getattr(mp_pose.PoseLandmark, f"{_prefix}_WRIST").value,
+                    "heel":       getattr(mp_pose.PoseLandmark, f"{_prefix}_HEEL").value,
+                    "foot_index": getattr(mp_pose.PoseLandmark, f"{_prefix}_FOOT_INDEX").value,
                 }
                 _connections = [
                     ("shoulder", "hip"),
                     ("hip", "knee"),
                     ("knee", "ankle"),
+                    ("ankle", "heel"),
+                    ("heel", "foot_index"),
                     ("shoulder", "elbow"),
                     ("elbow", "wrist"),
                 ]
