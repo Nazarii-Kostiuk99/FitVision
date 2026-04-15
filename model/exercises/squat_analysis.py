@@ -18,6 +18,7 @@ def get_initial_squat_rep_data():
     return {
         "max_depth_ratio": 0,
         "min_knee_angle": 999,
+        "max_knee_angle": 0,  # peak knee angle (standing position) for ROM calculation
         "lean_angles": [],
         "max_thigh_angle": 0,
         "lowest_point_angles": None,  # store angles dict at lowest point
@@ -27,7 +28,7 @@ def get_initial_squat_rep_data():
     }
 
 
-def rep_score(depth_result, thigh_result, posture_result, heels_result):
+def rep_score(depth_result, thigh_result, posture_result, heels_result, knee_rom=None):
     score = 100
 
     # Depth
@@ -41,7 +42,7 @@ def rep_score(depth_result, thigh_result, posture_result, heels_result):
     # Thighs
     if thigh_result == "Not reaching parallel":
         score -= 20
-    elif thigh_result == "Thigs are slightly above parallel":
+    elif thigh_result == "Thighs are slightly above parallel":
         score -= 10
 
     # Posture
@@ -53,6 +54,13 @@ def rep_score(depth_result, thigh_result, posture_result, heels_result):
     # Heels
     if heels_result.startswith("Heels lifted"):
         score -= 15
+
+    # Knee ROM
+    if knee_rom is not None:
+        if knee_rom < 60:
+            score -= 20
+        elif knee_rom < 80:
+            score -= 10
 
     score = max(0, min(100, score))
 
@@ -190,6 +198,9 @@ def analyse_squat(landmarks, mp_pose, reps, state, rep_data, rep_feedback_blocks
     UP_THRESHOLD = 140
     DOWN_THRESHOLD = 110
 
+    # track peak angle every frame — the max across the full rep is the standing angle
+    rep_data["max_knee_angle"] = max(rep_data["max_knee_angle"], knee_angle)
+
     rep_finished = False
     if state == "up" and knee_angle < DOWN_THRESHOLD:
         state = "down"
@@ -230,11 +241,11 @@ def analyse_squat(landmarks, mp_pose, reps, state, rep_data, rep_feedback_blocks
         # ---------------- THIGHS  ----------------
         max_thigh = rep_data["max_thigh_angle"]
         if max_thigh >= 90:
-            thigh_result = "Thighs are bellow parallel"
+            thigh_result = "Thighs are below parallel"
         elif max_thigh >= 75:
-            thigh_result = "Great range or motion. Thigs are parallel to the ground"
+            thigh_result = "Great range of motion. Thighs are parallel to the ground"
         elif max_thigh >= 55:
-            thigh_result = "Thigs are slightly above parallel"
+            thigh_result = "Thighs are slightly above parallel"
         else:
             thigh_result = "Not reaching parallel"
 
@@ -259,14 +270,18 @@ def analyse_squat(landmarks, mp_pose, reps, state, rep_data, rep_feedback_blocks
         else:
             heels_result = "Stable"
         score, grade = rep_score(
-            depth_result, thigh_result, posture_result, heels_result
+            depth_result, thigh_result, posture_result, heels_result, knee_rom
         )
+
+        # knee ROM = peak standing angle minus deepest angle reached
+        knee_rom = rep_data["max_knee_angle"] - rep_data["min_knee_angle"]
 
         rep_feedback.append(f"Score: {score}/100 ({grade})")
         rep_feedback.append(f"Depth: {depth_result}")
         rep_feedback.append(f"Thighs: {thigh_result}")
         rep_feedback.append(f"Posture: {posture_result}")
         rep_feedback.append(f"Heels: {heels_result}")
+        rep_feedback.append(f"Knee ROM: {int(knee_rom)} deg")
 
         rep_feedback_blocks.append(
             {
@@ -277,6 +292,8 @@ def analyse_squat(landmarks, mp_pose, reps, state, rep_data, rep_feedback_blocks
                 "feedback": rep_feedback,
                 "max_depth_ratio": rep_data["max_depth_ratio"],
                 "min_knee_angle": rep_data["min_knee_angle"],
+                "max_knee_angle": rep_data["max_knee_angle"],
+                "knee_rom": knee_rom,
                 "lean_median": rep_lean,
                 "max_thigh_angle": rep_data["max_thigh_angle"],
                 "depth_result": depth_result,
