@@ -65,7 +65,9 @@ def detect_side(landmarks, mp_pose):
         return "right"
 
 
-def analyse_pushup(landmarks, mp_pose, reps, state, rep_data, rep_feedback_blocks, video_timestamp=0.0):
+def analyse_pushup(
+    landmarks, mp_pose, reps, state, rep_data, rep_feedback_blocks, video_timestamp=0.0
+):
 
     # settings side after detection
     if rep_data["side"] is None:
@@ -234,7 +236,7 @@ def analyse_pushup(landmarks, mp_pose, reps, state, rep_data, rep_feedback_block
                 shoulder_result = "Too far forward"
                 score -= 20
 
-            # ------------------ neck ------------------
+            # ------------------ neck (CVA) ------------------
             avg_neck = float(np.mean(rep_data["neck_angles"])) if rep_data["neck_angles"] else neck_angle
             if 115 <= avg_neck <= 155:
                 neck_result = "Neutral"
@@ -249,10 +251,10 @@ def analyse_pushup(landmarks, mp_pose, reps, state, rep_data, rep_feedback_block
                 else 0
             )
 
-            if rep_time < 0.8:
+            if rep_time < 1.5:
                 tempo_result = "Too fast"
                 score -= 12
-            elif rep_time > 4.0:
+            elif rep_time > 6.0:
                 tempo_result = "Too slow"
             else:
                 tempo_result = "Controlled"
