@@ -51,10 +51,3 @@ def angle_to_vertical_degrees(x1, x2):
 
     theta = math.degrees(math.acos(cos_theta))
     return theta
-
-
-def thigh_to_horizontal(hip, knee):
-    """0° = vertical (standing), 90° = horizontal (parallel to ground)"""
-    dx = abs(knee[0] - hip[0])
-    dy = abs(knee[1] - hip[1])
-    return math.degrees(math.atan2(dx, dy))

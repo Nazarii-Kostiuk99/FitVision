@@ -5,7 +5,6 @@ Exercise form analysis functions
 from Utility.angle_calculations import (
     calculate_angle,
     angle_to_vertical_degrees,
-    thigh_to_horizontal,
 )
 import statistics
 
@@ -164,7 +163,7 @@ def analyse_squat(landmarks, mp_pose, reps, state, rep_data, rep_feedback_blocks
     ####################### calculation of key angles ########################
 
     knee_angle = calculate_angle(hip, knee, ankle)
-    thigh_angle = thigh_to_horizontal(hip, knee)
+    thigh_angle = angle_to_vertical_degrees(knee, hip)
     hip_y = hip[1]  # vert. pos. of hip
     knee_y = knee[1]  # vert. pos. of knee
     shoulder_y = shoulder[1]  # vert. pos. of shoudler

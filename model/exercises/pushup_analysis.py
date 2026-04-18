@@ -189,10 +189,7 @@ def analyse_pushup(
 
             # |------------------ core (hip sag/pike) ------------------|
 
-            # LANDMARKS: Shoulder, Hip, Ankle.
-            # ANGLE: If the Shoulder-Hip-Ankle angle < 158°, the form is breaking.
-            #    - Low h Y is (small number), the hip is high in the air (PIKE).
-            #    - If Hip Y is HIGH (large number), the hip is dropping toward the floor (SAG).
+        
             avg_hip_y = statistics.mean(rep_data["hip_positions"])
 
             hip_drop = rep_data["max_hip_y"] - rep_data["hip_y_start"]  # positive = sag
@@ -236,7 +233,7 @@ def analyse_pushup(
                 shoulder_result = "Too far forward"
                 score -= 20
 
-            # ------------------ neck (CVA) ------------------
+            # ------------------ neck  ------------------
             avg_neck = float(np.mean(rep_data["neck_angles"])) if rep_data["neck_angles"] else neck_angle
             if 115 <= avg_neck <= 155:
                 neck_result = "Neutral"
@@ -270,10 +267,10 @@ def analyse_pushup(
             else:
                 grade = "Needs work"
 
-            print(f"DEBUG min_elbow: {min_elbow:.1f}")
-            print(f"DEBUG min_body: {cur_min_body:.1f}")
-            print(f"DEBUG max_body: {cur_max_body:.1f}")
-            print(f"DEBUG max_shoulder_offset: {max(rep_data['shoulder_offsets']):.3f}")
+            # print(f"DEBUG min_elbow: {min_elbow:.1f}")
+            # print(f"DEBUG min_body: {cur_min_body:.1f}")
+            # print(f"DEBUG max_body: {cur_max_body:.1f}")
+            # print(f"DEBUG max_shoulder_offset: {max(rep_data['shoulder_offsets']):.3f}")
             # print(f"DEBUG hip_rise: {hip_rise:.1f}")
             # print(f"DEBUG hip_drop: {hip_drop:.1f}")
             # print(f"DEBUG hip_y: {hip.y:.3f}  body_angle: {body_angle:.1f}")
