@@ -274,11 +274,11 @@ def analyse_pushup(
             # print(f"DEBUG hip_rise: {hip_rise:.1f}")
             # print(f"DEBUG hip_drop: {hip_drop:.1f}")
             # print(f"DEBUG hip_y: {hip.y:.3f}  body_angle: {body_angle:.1f}")
-            print(f"DEBUG avg_hip_y: {avg_hip_y:.3f}")
-            print(f"DEBUG max_shoulder_offset: {max(rep_data['shoulder_offsets']):.3f}")
+            # print(f"DEBUG avg_hip_y: {avg_hip_y:.3f}")
+            # print(f"DEBUG max_shoulder_offset: {max(rep_data['shoulder_offsets']):.3f}")
             if rep_data["rep_start_time"]:
                 rep_time = rep_data["rep_end_time"] - rep_data["rep_start_time"]
-                print(f"DEBUG rep_time: {rep_time:.2f}s\n")
+                # print(f"DEBUG rep_time: {rep_time:.2f}s\n")
 
             feedback_lines.append(f"Score: {score}/100 ({grade})")
             feedback_lines.append(f"Depth: {depth_result}")
@@ -301,6 +301,24 @@ def analyse_pushup(
 
     ################################ RETURN ###############################
 
+    # live cues — only meaningful during down phase
+    if state == "down":
+        if body_angle < 145:
+            live_feedback = "Hips out of line"
+            live_colour = (60, 60, 220)
+        elif shoulder_offset_norm >= 0.35:
+            live_feedback = "Shift back - too far forward"
+            live_colour = (0, 165, 255)
+        elif body_angle < 158:
+            live_feedback = "Keep body straight"
+            live_colour = (0, 165, 255)
+        else:
+            live_feedback = "Good form"
+            live_colour = (80, 200, 80)
+    else:
+        live_feedback = "Ready"
+        live_colour = (255, 255, 255)
+
     angles = {
         "elbow": (elbow_angle, elbow_coords),
         "body": (body_angle, hip_coords),
@@ -308,8 +326,8 @@ def analyse_pushup(
 
     return (
         elbow_angle,
-        "Pushup analysis",
-        (0, 255, 255),
+        live_feedback,
+        live_colour,
         side_label,
         angles,
         rep_data["min_elbow_angle"],

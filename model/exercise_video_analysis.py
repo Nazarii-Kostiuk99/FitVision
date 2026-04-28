@@ -51,7 +51,11 @@ def analyse_video(video_path, exercise_type, output_dir="outputs", analysis_id=N
         print(f"Exercise '{exercise_type}' not supported yet")
         return None
 
-    base_name = f"analysis_{analysis_id}" if analysis_id else os.path.splitext(os.path.basename(video_path))[0]
+    base_name = (
+        f"analysis_{analysis_id}"
+        if analysis_id
+        else os.path.splitext(os.path.basename(video_path))[0]
+    )
 
     video_path = preprocess_video(video_path)  # mov (iPhone format) -> anonymised mp4
     os.makedirs(output_dir, exist_ok=True)
@@ -59,6 +63,8 @@ def analyse_video(video_path, exercise_type, output_dir="outputs", analysis_id=N
 
     reps = 0
     state = "up"
+    prev_reps = 0
+    worst_fault = "None"
 
     if exercise_type == "squat":
         rep_data = get_initial_squat_rep_data()
@@ -169,14 +175,18 @@ def analyse_video(video_path, exercise_type, output_dir="outputs", analysis_id=N
                 else:
                     _prefix = "RIGHT"
                 _ids = {
-                    "shoulder":   getattr(mp_pose.PoseLandmark, f"{_prefix}_SHOULDER").value,
-                    "elbow":      getattr(mp_pose.PoseLandmark, f"{_prefix}_ELBOW").value,
-                    "hip":        getattr(mp_pose.PoseLandmark, f"{_prefix}_HIP").value,
-                    "knee":       getattr(mp_pose.PoseLandmark, f"{_prefix}_KNEE").value,
-                    "ankle":      getattr(mp_pose.PoseLandmark, f"{_prefix}_ANKLE").value,
-                    "wrist":      getattr(mp_pose.PoseLandmark, f"{_prefix}_WRIST").value,
-                    "heel":       getattr(mp_pose.PoseLandmark, f"{_prefix}_HEEL").value,
-                    "foot_index": getattr(mp_pose.PoseLandmark, f"{_prefix}_FOOT_INDEX").value,
+                    "shoulder": getattr(
+                        mp_pose.PoseLandmark, f"{_prefix}_SHOULDER"
+                    ).value,
+                    "elbow": getattr(mp_pose.PoseLandmark, f"{_prefix}_ELBOW").value,
+                    "hip": getattr(mp_pose.PoseLandmark, f"{_prefix}_HIP").value,
+                    "knee": getattr(mp_pose.PoseLandmark, f"{_prefix}_KNEE").value,
+                    "ankle": getattr(mp_pose.PoseLandmark, f"{_prefix}_ANKLE").value,
+                    "wrist": getattr(mp_pose.PoseLandmark, f"{_prefix}_WRIST").value,
+                    "heel": getattr(mp_pose.PoseLandmark, f"{_prefix}_HEEL").value,
+                    "foot_index": getattr(
+                        mp_pose.PoseLandmark, f"{_prefix}_FOOT_INDEX"
+                    ).value,
                 }
                 _connections = [
                     ("shoulder", "hip"),
@@ -234,26 +244,59 @@ def analyse_video(video_path, exercise_type, output_dir="outputs", analysis_id=N
                 BAD = (60, 60, 220)
                 WHITE = (240, 240, 240)
                 GOLD = (50, 200, 220)
+
+                # reset worst fault on new rep
+                if reps != prev_reps:
+                    worst_fault = "None"
+                    prev_reps = reps
+
+                if state == "down":
+                    if heel_lifted_current:
+                        worst_fault = "Heels lifting"
+                    elif lean_angle >= 35 and worst_fault not in ["Heels lifting"]:
+                        worst_fault = "Too much lean"
+                    elif lean_angle >= 25 and worst_fault == "None":
+                        worst_fault = "Forward lean"
+                    elif depth_ratio < 0.6 and worst_fault == "None":
+                        worst_fault = "Too shallow"
+
+                # depth as category
+                if depth_ratio > 1.2:
+                    depth_cat = "Too deep"
+                elif depth_ratio >= 0.7:
+                    depth_cat = "Good depth"
+                elif depth_ratio >= 0.6:
+                    depth_cat = "Shallow"
+                else:
+                    depth_cat = "Going down..."
+
+                fault_colour = BAD if worst_fault != "None" else GOOD
+
                 metrics = [
                     (
-                        "Knee Angle  (bend at bottom)",
+                        "Knee Angle",
                         f"{int(angle)} deg",
                         GOOD if angle < 100 else WARN,
                     ),
                     (
-                        "Squat Depth  (parallel = 1.0)",
-                        f"{depth_ratio:.2f}",
-                        GOOD if depth_ratio >= 0.9 else WARN,
+                        "Depth",
+                        depth_cat,
+                        GOOD if depth_ratio >= 0.7 else WARN,
                     ),
                     (
-                        "Torso Lean  (ideally < 45 deg)",
+                        "Torso Lean",
                         f"{lean_angle:.1f} deg",
-                        GOOD if lean_angle < 45 else WARN,
+                        GOOD if lean_angle < 25 else WARN,
                     ),
                     (
                         "Heels",
                         "Lifted" if heel_lifted_current else "Grounded",
                         BAD if heel_lifted_current else GOOD,
+                    ),
+                    (
+                        "Worst fault of rep",
+                        worst_fault,
+                        fault_colour,
                     ),
                 ]
 
@@ -289,26 +332,58 @@ def analyse_video(video_path, exercise_type, output_dir="outputs", analysis_id=N
                 BAD = (60, 60, 220)
                 WHITE = (240, 240, 240)
                 GOLD = (50, 200, 220)
+
+                if reps != prev_reps:
+                    worst_fault = "None"
+                    prev_reps = reps
+
+                if state == "down":
+                    if body_angle < 145 and worst_fault not in ["Hips out of line"]:
+                        worst_fault = "Hips out of line"
+                    elif shoulder_offset_current >= 0.35 and worst_fault == "None":
+                        worst_fault = "Too far forward"
+                    elif body_angle < 158 and worst_fault == "None":
+                        worst_fault = "Body not straight"
+                    elif angle > 95 and worst_fault == "None":
+                        worst_fault = "Shallow depth"
+
+                # elbow depth as category
+                if angle < 80:
+                    depth_cat = "Excellent"
+                elif angle <= 95:
+                    depth_cat = "Good"
+                elif angle <= 120:
+                    depth_cat = "Shallow"
+                else:
+                    depth_cat = "Too shallow"
+
+                fault_colour = BAD if worst_fault != "None" else GOOD
+
                 metrics = [
                     (
-                        "Elbow Angle  (arm bend at bottom)",
+                        "Elbow Angle",
                         f"{int(angle)} deg",
-                        GOOD if angle < 100 else WARN,
+                        GOOD if angle < 95 else WARN,
                     ),
                     (
-                        "Body Line  (straight = 180 deg)",
+                        "Depth",
+                        depth_cat,
+                        GOOD if angle <= 95 else WARN,
+                    ),
+                    (
+                        "Body Line",
                         f"{int(body_angle)} deg",
                         GOOD if abs(body_angle - 180) < 15 else WARN,
                     ),
                     (
-                        "Shoulder Shift  (lateral drift)",
+                        "Shoulder Shift",
                         f"{shoulder_offset_current:.2f}",
-                        GOOD if shoulder_offset_current < 0.05 else WARN,
+                        GOOD if shoulder_offset_current < 0.25 else WARN,
                     ),
                     (
-                        "Neck Angle  (head position)",
-                        f"{int(neck_angle)} deg",
-                        GOOD if neck_angle < 30 else WARN,
+                        "Worst fault of rep",
+                        worst_fault,
+                        fault_colour,
                     ),
                 ]
 
@@ -358,7 +433,7 @@ def analyse_video(video_path, exercise_type, output_dir="outputs", analysis_id=N
 
                     # offset spine overlay toward the back of the body
                     # rotate torso vec (shoulder→hip) 90° and pick direction away from wrist
-                    SPINE_BACK_OFFSET = 100
+                    SPINE_BACK_OFFSET = 50
                     side_key = "LEFT" if rep_data.get("side") == "left" else "RIGHT"
                     s_lm = landmarks[
                         getattr(mp_pose.PoseLandmark, f"{side_key}_SHOULDER").value
@@ -413,28 +488,82 @@ def analyse_video(video_path, exercise_type, output_dir="outputs", analysis_id=N
                 BAD = (60, 60, 220)
                 WHITE = (240, 240, 240)
                 GOLD = (50, 200, 220)
+
+                if reps != prev_reps:
+                    worst_fault = "None"
+                    prev_reps = reps
+
+                if state == "down":
+                    if (
+                        cur_spine_curv is not None
+                        and cur_spine_curv >= 0.10
+                        and worst_fault not in ["Spine rounding"]
+                    ):
+                        worst_fault = "Spine rounding"
+                    elif (
+                        cur_spine_curv is not None
+                        and cur_spine_curv >= 0.05
+                        and worst_fault == "None"
+                    ):
+                        worst_fault = "Slight rounding"
+                    elif cur_bar_drift >= 0.20 and worst_fault == "None":
+                        worst_fault = "Bar drifting"
+                    elif angle > 85 and worst_fault == "None":
+                        worst_fault = "Not deep enough"
+
+                # spine curve as category
+                if cur_spine_curv is None:
+                    spine_cat = "Not detected"
+                    spine_colour = WHITE
+                elif cur_spine_curv < 0.05:
+                    spine_cat = "Neutral"
+                    spine_colour = GOOD
+                elif cur_spine_curv < 0.10:
+                    spine_cat = "Slight rounding"
+                    spine_colour = WARN
+                else:
+                    spine_cat = "Rounding!"
+                    spine_colour = BAD
+
+                # bar drift as category
+                if cur_bar_drift < 0.10:
+                    bar_cat = "Close"
+                    bar_colour = GOOD
+                elif cur_bar_drift < 0.20:
+                    bar_cat = "Slight drift"
+                    bar_colour = WARN
+                else:
+                    bar_cat = "Drifting"
+                    bar_colour = BAD
+
+                fault_colour = BAD if worst_fault != "None" else GOOD
+
                 metrics = [
                     (
-                        "Hip Angle  (hinge depth)",
+                        "Hip Angle",
                         f"{int(angle)} deg",
-                        GOOD if angle < 90 else WARN,
+                        GOOD if angle < 85 else WARN,
                     ),
                     (
-                        "Back Angle  (torso from vertical)",
-                        f"{int(back_angle)} deg",
-                        GOOD if back_angle < 40 else WARN,
+                        "Spine",
+                        spine_cat,
+                        spine_colour,
                     ),
                     (
-                        "Spine Curve  (0 = neutral spine)",
-                        f"{cur_spine_curv:.3f}",
-                        GOOD if cur_spine_curv < 0.03 else (WARN if cur_spine_curv < 0.25 else BAD),
+                        "Bar Path",
+                        bar_cat,
+                        bar_colour,
                     ),
                     (
-                        "Bar Drift  (distance from body)",
-                        f"{cur_bar_drift:.3f}",
-                        GOOD if cur_bar_drift < 0.05 else WARN,
+                        "Knee Angle",
+                        f"{int(knee_angle_cur)} deg",
+                        WHITE,
                     ),
-                    ("Knee Angle", f"{int(knee_angle_cur)} deg", WHITE),
+                    (
+                        "Worst fault of rep",
+                        worst_fault,
+                        fault_colour,
+                    ),
                 ]
 
             # ── overlay helpers ───────────────────────────────────────────
@@ -445,51 +574,99 @@ def analyse_video(video_path, exercise_type, output_dir="outputs", analysis_id=N
                 cv2.rectangle(f, (x1, y1), (x2, y2), (60, 60, 60), 1)
 
             def draw_metric(f, x, y, label, value, val_color=(240, 240, 240)):
-                cv2.putText(f, label, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.55,
-                            (190, 190, 190), 1, cv2.LINE_AA)
-                cv2.putText(f, value, (x, y + 22), cv2.FONT_HERSHEY_SIMPLEX, 0.72,
-                            val_color, 2, cv2.LINE_AA)
+                cv2.putText(
+                    f,
+                    label,
+                    (x, y),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.68,
+                    (255, 255, 255),
+                    1,
+                    cv2.LINE_AA,
+                )
+                cv2.putText(
+                    f,
+                    value,
+                    (x, y + 30),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.92,
+                    val_color,
+                    2,
+                    cv2.LINE_AA,
+                )
 
-            # ── metrics panel (top-right) ─────────────────────────────────
-            panel_w = 360
-            row_h = 50
-            pad = 10
+            # ── counter box (top-left) ────────────────────────────────────
+            panel_w = 460
+            counter_h = 155
+            draw_panel(frame, 10, 10, panel_w, counter_h)
+
+            caption = f"{exercise_type.capitalize()} Analysis"
+            cv2.putText(
+                frame,
+                caption,
+                (20, 38),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.75,
+                (255, 255, 255),
+                2,
+                cv2.LINE_AA,
+            )
+
+            rep_str = str(reps)
+            rep_scale = 3.2 if reps < 10 else 2.6
+            cv2.putText(
+                frame,
+                rep_str,
+                (20, 128),
+                cv2.FONT_HERSHEY_DUPLEX,
+                rep_scale,
+                GOLD,
+                3,
+                cv2.LINE_AA,
+            )
+
+            phase_colour = GOOD if state == "up" else WARN
+            cv2.putText(
+                frame,
+                "REPS",
+                (160, 78),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.75,
+                (255, 255, 255),
+                2,
+                cv2.LINE_AA,
+            )
+            cv2.putText(
+                frame,
+                state.upper(),
+                (160, 112),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.92,
+                phase_colour,
+                2,
+                cv2.LINE_AA,
+            )
+            cv2.putText(
+                frame,
+                side.capitalize(),
+                (160, 142),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.65,
+                (200, 200, 200),
+                1,
+                cv2.LINE_AA,
+            )
+
+            # ── metrics panel (left, below counter) ──────────────────────
+            row_h = 68
+            pad = 14
             panel_h = pad + len(metrics) * row_h + pad
-            px1 = width - panel_w - 10
-            py1 = 10
-            draw_panel(frame, px1, py1, width - 10, py1 + panel_h)
+            px1 = 10
+            py1 = counter_h + 8
+            draw_panel(frame, px1, py1, px1 + panel_w, py1 + panel_h)
             for i, (label, value, val_color) in enumerate(metrics):
                 row_y = py1 + pad + i * row_h
-                draw_metric(frame, px1 + 10, row_y + 14, label, value, val_color)
-
-            # ── exercise title + rep counter + phase (top-left) ──────────
-            caption = f"{exercise_type.capitalize()} analysis"
-            (cw, _ch), _ = cv2.getTextSize(caption, cv2.FONT_HERSHEY_SIMPLEX, 0.58, 1)
-            title_panel_w = max(cw + 20, 300)
-            draw_panel(frame, 10, 10, title_panel_w, 145)
-            cv2.putText(frame, caption, (18, 34), cv2.FONT_HERSHEY_SIMPLEX,
-                        0.58, (180, 180, 180), 1, cv2.LINE_AA)
-            # rep number — shrink font if >= 10 to avoid overflow
-            rep_str = str(reps)
-            rep_scale = 2.6
-            rep_y = 118
-            cv2.putText(frame, rep_str, (18, rep_y), cv2.FONT_HERSHEY_DUPLEX,
-                        rep_scale, GOLD, 3, cv2.LINE_AA)
-            rep_txt_w = 140
-            cv2.putText(frame, "REPS", (rep_txt_w, 68), cv2.FONT_HERSHEY_SIMPLEX,
-                        0.58, (150, 150, 150), 1, cv2.LINE_AA)
-            phase_col = GOOD if state == "up" else WARN
-            cv2.putText(frame, state.upper(), (rep_txt_w, 96), cv2.FONT_HERSHEY_SIMPLEX,
-                        0.78, phase_col, 2, cv2.LINE_AA)
-            cv2.putText(frame, f"{side.capitalize()} side", (rep_txt_w, 120),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.48, (130, 130, 130), 1, cv2.LINE_AA)
-
-            # ── feedback bar (only shown when there is a message) ─────────
-            if feedback:
-                (fw, _fh), _ = cv2.getTextSize(feedback, cv2.FONT_HERSHEY_SIMPLEX, 0.85, 2)
-                draw_panel(frame, 10, 152, fw + 30, 192)
-                cv2.putText(frame, feedback, (18, 180), cv2.FONT_HERSHEY_SIMPLEX,
-                            0.85, color, 2, cv2.LINE_AA)
+                draw_metric(frame, px1 + 14, row_y + 14, label, value, val_color)
 
             # ── joint angle labels ────────────────────────────────────────
             for _name, (ang, coord) in angles.items():
@@ -497,10 +674,19 @@ def analyse_video(video_path, exercise_type, output_dir="outputs", analysis_id=N
                 y = int(coord[1] * height)
                 label = f"{int(ang)} deg"
                 (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.52, 1)
-                cv2.rectangle(frame, (x + 6, y - th - 16), (x + tw + 14, y - 4),
-                              (20, 20, 20), -1)
-                cv2.putText(frame, label, (x + 10, y - 8), cv2.FONT_HERSHEY_SIMPLEX,
-                            0.52, WHITE, 1, cv2.LINE_AA)
+                cv2.rectangle(
+                    frame, (x + 6, y - th - 16), (x + tw + 14, y - 4), (20, 20, 20), -1
+                )
+                cv2.putText(
+                    frame,
+                    label,
+                    (x + 10, y - 8),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.52,
+                    WHITE,
+                    1,
+                    cv2.LINE_AA,
+                )
 
         out.write(frame)
 

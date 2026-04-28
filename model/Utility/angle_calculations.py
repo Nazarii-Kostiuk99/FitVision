@@ -21,7 +21,7 @@ def calculate_angle(a, b, c):
 
     return np.degrees(angle)
 
-    # Returns the angle (in degrees) between 2 vectors and the vertical axis.
+    # Returns the angle (in degrees) between 2 vectors and the vertical axis
     # p1, p2 are [x, y] in normalized mediapipe coords.
 
     # 0 degrees = perfectly vertical

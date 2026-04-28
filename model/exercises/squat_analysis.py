@@ -12,6 +12,30 @@ import statistics
 ############################################# SQUAT ANALYSIS ################################################
 
 
+def detect_side(landmarks, mp_pose):
+    left_points = [
+        mp_pose.PoseLandmark.LEFT_SHOULDER.value,
+        mp_pose.PoseLandmark.LEFT_KNEE.value,
+        mp_pose.PoseLandmark.LEFT_HIP.value,
+        mp_pose.PoseLandmark.LEFT_ANKLE.value,
+    ]
+
+    right_points = [
+        mp_pose.PoseLandmark.RIGHT_SHOULDER.value,
+        mp_pose.PoseLandmark.RIGHT_KNEE.value,
+        mp_pose.PoseLandmark.RIGHT_HIP.value,
+        mp_pose.PoseLandmark.RIGHT_ANKLE.value,
+    ]
+
+    left_visibility = sum(landmarks[i].visibility for i in left_points) / len(left_points)
+    right_visibility = sum(landmarks[i].visibility for i in right_points) / len(right_points)
+
+    if left_visibility >= right_visibility:
+        return "left"
+    else:
+        return "right"
+
+
 # stores per-rep tracking data ->  Reset after every completed rep
 def get_initial_squat_rep_data():
     return {
@@ -134,12 +158,13 @@ def analyse_squat(landmarks, mp_pose, reps, state, rep_data, rep_feedback_blocks
         landmarks[mp_pose.PoseLandmark.LEFT_FOOT_INDEX.value].y,
     ]
 
-    # check visibility (to determine side l/r)
-    r_visibility = landmarks[mp_pose.PoseLandmark.RIGHT_KNEE.value].visibility
-    l_visibility = landmarks[mp_pose.PoseLandmark.LEFT_KNEE.value].visibility
+    # lock side on first frame
+    if rep_data["side"] is None:
+        rep_data["side"] = detect_side(landmarks, mp_pose)
 
-    # choose side with better visibility
-    if r_visibility > l_visibility:
+    side_detected = rep_data["side"]
+
+    if side_detected == "right":
         shoulder, hip, knee, ankle, heel, foot_index = (
             r_shoulder,
             r_hip,
@@ -186,7 +211,6 @@ def analyse_squat(landmarks, mp_pose, reps, state, rep_data, rep_feedback_blocks
     ####################### REP STATE MACHINE & TRACKING ########################
     if state == "down":
         rep_data["valid"] = True
-        rep_data["side"] = side
         rep_data["max_depth_ratio"] = max(rep_data["max_depth_ratio"], depth_ratio)
         rep_data["min_knee_angle"] = min(rep_data["min_knee_angle"], knee_angle)
         rep_data["max_thigh_angle"] = max(rep_data["max_thigh_angle"], thigh_angle)
@@ -218,7 +242,7 @@ def analyse_squat(landmarks, mp_pose, reps, state, rep_data, rep_feedback_blocks
     ####################### BUILD FEEDBACK ONLY WHEN REP FINISHES ########################
 
     if rep_finished and rep_data["valid"]:
-        print(f"DEBUG max_thigh: {rep_data['max_thigh_angle']:.1f}")
+        # print(f"DEBUG max_thigh: {rep_data['max_thigh_angle']:.1f}")
         rep_feedback = []
 
         max_depth = rep_data["max_depth_ratio"]
@@ -268,12 +292,12 @@ def analyse_squat(landmarks, mp_pose, reps, state, rep_data, rep_feedback_blocks
             heels_result = "Heels lifted — keep weight mid-foot / heel"
         else:
             heels_result = "Stable"
+        # knee ROM = peak standing angle minus deepest angle reached
+        knee_rom = rep_data["max_knee_angle"] - rep_data["min_knee_angle"]
+
         score, grade = rep_score(
             depth_result, thigh_result, posture_result, heels_result, knee_rom
         )
-
-        # knee ROM = peak standing angle minus deepest angle reached
-        knee_rom = rep_data["max_knee_angle"] - rep_data["min_knee_angle"]
 
         rep_feedback.append(f"Score: {score}/100 ({grade})")
         rep_feedback.append(f"Depth: {depth_result}")
@@ -287,7 +311,7 @@ def analyse_squat(landmarks, mp_pose, reps, state, rep_data, rep_feedback_blocks
                 "score": score,
                 "grade": grade,
                 "rep": reps,
-                "side": rep_data["side"],
+                "side": side,
                 "feedback": rep_feedback,
                 "max_depth_ratio": rep_data["max_depth_ratio"],
                 "min_knee_angle": rep_data["min_knee_angle"],
@@ -302,14 +326,31 @@ def analyse_squat(landmarks, mp_pose, reps, state, rep_data, rep_feedback_blocks
             }
         )
 
-        # reset for next rep
+        # reset for next rep, keep side locked
         rep_data = get_initial_squat_rep_data()
+        rep_data["side"] = side_detected
 
     ####################### PER-FRAME DISPLAY FEEDBACK ########################
 
     if state == "down":
-        primary_feedback = "Down"
-        colour = (0, 255, 255)
+        worst_lean = (
+            max(rep_data["lean_angles"]) if rep_data["lean_angles"] else lean_angle
+        )
+        if heel_lifted_current:
+            primary_feedback = "Heels lifting!"
+            colour = (60, 60, 220)
+        elif worst_lean >= 35:
+            primary_feedback = "Too much forward lean"
+            colour = (60, 60, 220)
+        elif worst_lean >= 25:
+            primary_feedback = "Slight forward lean"
+            colour = (0, 165, 255)
+        elif depth_ratio < 0.6 and knee_angle < 120:
+            primary_feedback = "Go deeper"
+            colour = (0, 165, 255)
+        else:
+            primary_feedback = "Good form"
+            colour = (80, 200, 80)
     else:
         primary_feedback = "Ready"
         colour = (255, 255, 255)

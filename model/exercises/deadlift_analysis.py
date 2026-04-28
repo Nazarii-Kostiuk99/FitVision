@@ -411,6 +411,23 @@ def analyse_deadlift(
 
     ################################ RETURN ###############################
 
+    if state == "down":
+        if cur_spine_curv is not None and cur_spine_curv >= 0.10:
+            live_feedback = "Spine rounding!"
+            live_colour = (60, 60, 220)
+        elif cur_spine_curv is not None and cur_spine_curv >= 0.05:
+            live_feedback = "Slight rounding - brace core"
+            live_colour = (0, 165, 255)
+        elif cur_bar_drift >= 0.20:
+            live_feedback = "Bar drifting away"
+            live_colour = (0, 165, 255)
+        else:
+            live_feedback = "Good form"
+            live_colour = (80, 200, 80)
+    else:
+        live_feedback = "Ready"
+        live_colour = (255, 255, 255)
+
     angles = {
         "hip": (hip_angle, hip_coords),
         "knee": (knee_angle, knee_coords),
@@ -418,8 +435,8 @@ def analyse_deadlift(
 
     return (
         hip_angle,
-        "",
-        (0, 165, 255), 
+        live_feedback,
+        live_colour,
         side_label,
         angles,
         knee_angle,
