@@ -27,8 +27,12 @@ def detect_side(landmarks, mp_pose):
         mp_pose.PoseLandmark.RIGHT_ANKLE.value,
     ]
 
-    left_visibility = sum(landmarks[i].visibility for i in left_points) / len(left_points)
-    right_visibility = sum(landmarks[i].visibility for i in right_points) / len(right_points)
+    left_visibility = sum(landmarks[i].visibility for i in left_points) / len(
+        left_points
+    )
+    right_visibility = sum(landmarks[i].visibility for i in right_points) / len(
+        right_points
+    )
 
     if left_visibility >= right_visibility:
         return "left"
@@ -278,11 +282,11 @@ def analyse_squat(landmarks, mp_pose, reps, state, rep_data, rep_feedback_blocks
         else:
             rep_lean = 0
 
-        if rep_lean < 15:
+        if rep_lean < 35:
             posture_result = "Great upright posture"
-        elif rep_lean < 25:
+        elif rep_lean < 50:
             posture_result = "Slight forward lean"
-        elif rep_lean < 35:
+        elif rep_lean < 65:
             posture_result = "Forward lean"
         else:
             posture_result = "Too much forward lean"

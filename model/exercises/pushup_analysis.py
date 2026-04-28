@@ -260,9 +260,9 @@ def analyse_pushup(
 
             if score >= 90:
                 grade = "Excellent"
-            elif score >= 78:
+            elif score >= 75:
                 grade = "Good"
-            elif score >= 60:
+            elif score >= 55:
                 grade = "Okay"
             else:
                 grade = "Needs work"
