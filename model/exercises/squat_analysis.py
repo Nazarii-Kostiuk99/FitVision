@@ -340,14 +340,17 @@ def analyse_squat(landmarks, mp_pose, reps, state, rep_data, rep_feedback_blocks
         worst_lean = (
             max(rep_data["lean_angles"]) if rep_data["lean_angles"] else lean_angle
         )
-        if heel_lifted_current:
-            primary_feedback = "Heels lifting!"
-            colour = (60, 60, 220)
-        elif worst_lean >= 35:
+        if worst_lean >= 65:
             primary_feedback = "Too much forward lean"
             colour = (60, 60, 220)
-        elif worst_lean >= 25:
+        elif worst_lean >= 50:
+            primary_feedback = "Forward lean"
+            colour = (60, 60, 220)
+        elif worst_lean >= 35:
             primary_feedback = "Slight forward lean"
+            colour = (0, 165, 255)
+        elif heel_lifted_current:
+            primary_feedback = "Heels lifting!"
             colour = (0, 165, 255)
         elif depth_ratio < 0.6 and knee_angle < 120:
             primary_feedback = "Go deeper"

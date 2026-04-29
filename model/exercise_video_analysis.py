@@ -57,7 +57,11 @@ def analyse_video(video_path, exercise_type, output_dir="outputs", analysis_id=N
         else os.path.splitext(os.path.basename(video_path))[0]
     )
 
+    raw_input_path = video_path
     video_path = preprocess_video(video_path)  # mov (iPhone format) -> anonymised mp4
+    # delete raw after anonymisation
+    if raw_input_path != video_path and os.path.exists(raw_input_path):
+        os.remove(raw_input_path)
     os.makedirs(output_dir, exist_ok=True)
     output_filename = os.path.join(output_dir, f"{base_name}_analysis.mp4")
 

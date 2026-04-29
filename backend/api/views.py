@@ -135,11 +135,7 @@ class AnalyseView(APIView):
             output_abs = result["output_video_path"]
             output_rel = os.path.relpath(output_abs, settings.MEDIA_ROOT)
 
-            # delete the raw input video
-            raw_path = analysis.input_video.path
             analysis.input_video.delete(save=False)
-            if os.path.exists(raw_path):
-                os.remove(raw_path)
 
             analysis.output_video = output_rel
             analysis.rep_feedback = result["rep_feedback"]
