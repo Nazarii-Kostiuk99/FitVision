@@ -8,7 +8,6 @@ from Utility.angle_calculations import (
 )
 import statistics
 
-
 ############################################# SQUAT ANALYSIS ################################################
 
 
@@ -282,11 +281,11 @@ def analyse_squat(landmarks, mp_pose, reps, state, rep_data, rep_feedback_blocks
         else:
             rep_lean = 0
 
-        if rep_lean < 35:
+        if rep_lean < 45:
             posture_result = "Great upright posture"
-        elif rep_lean < 50:
+        elif rep_lean < 60:
             posture_result = "Slight forward lean"
-        elif rep_lean < 65:
+        elif rep_lean < 75:
             posture_result = "Forward lean"
         else:
             posture_result = "Too much forward lean"
@@ -340,13 +339,13 @@ def analyse_squat(landmarks, mp_pose, reps, state, rep_data, rep_feedback_blocks
         worst_lean = (
             max(rep_data["lean_angles"]) if rep_data["lean_angles"] else lean_angle
         )
-        if worst_lean >= 65:
+        if worst_lean >= 75:
             primary_feedback = "Too much forward lean"
             colour = (60, 60, 220)
-        elif worst_lean >= 50:
+        elif worst_lean >= 60:
             primary_feedback = "Forward lean"
             colour = (60, 60, 220)
-        elif worst_lean >= 35:
+        elif worst_lean >= 45:
             primary_feedback = "Slight forward lean"
             colour = (0, 165, 255)
         elif heel_lifted_current:

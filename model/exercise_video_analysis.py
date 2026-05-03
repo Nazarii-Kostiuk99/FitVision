@@ -257,11 +257,11 @@ def analyse_video(video_path, exercise_type, output_dir="outputs", analysis_id=N
                 if state == "down":
                     if heel_lifted_current:
                         worst_fault = "Heels lifting"
-                    elif lean_angle >= 35 and worst_fault not in ["Heels lifting"]:
+                    elif lean_angle >= 75 and worst_fault not in ["Heels lifting"]:
                         worst_fault = "Too much lean"
-                    elif lean_angle >= 25 and worst_fault == "None":
+                    elif lean_angle >= 45 and worst_fault == "None":
                         worst_fault = "Forward lean"
-                    elif depth_ratio < 0.6 and worst_fault == "None":
+                    elif depth_ratio < 0.6 and angle < 100 and worst_fault == "None":
                         worst_fault = "Too shallow"
 
                 # depth as category
@@ -290,7 +290,7 @@ def analyse_video(video_path, exercise_type, output_dir="outputs", analysis_id=N
                     (
                         "Torso Lean",
                         f"{lean_angle:.1f} deg",
-                        GOOD if lean_angle < 25 else WARN,
+                        GOOD if lean_angle < 45 else WARN,
                     ),
                     (
                         "Heels",
