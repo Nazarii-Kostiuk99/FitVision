@@ -133,7 +133,7 @@ export default function HomeScreen({ navigation }) {
 
       const data = await response.json();
 
-      // phase 3: snap to 100%
+      //  snap to 100%
       clearInterval(crawlAnim.current);
       setStatusText("Done!");
       setProgress(100);
@@ -197,6 +197,15 @@ export default function HomeScreen({ navigation }) {
           ))}
         </View>
 
+        <View className="bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 mb-3 flex-row items-start">
+          <Text className="text-yellow-400 mr-2">⚠</Text>
+          <Text className="text-zinc-400 text-xs flex-1">
+            Position yourself approximately 90° to the camera at a distance
+            of 1.5–2 m, ensuring your full body is in frame. For best results,
+            record in a clear space with as few people around as possible.
+          </Text>
+        </View>
+
         <TouchableOpacity
           onPress={pickVideo}
           className="bg-zinc-900 border border-zinc-700 rounded-lg py-4 items-center mb-3"
@@ -222,6 +231,15 @@ export default function HomeScreen({ navigation }) {
         >
           <Text className="text-zinc-400">View History</Text>
         </TouchableOpacity>
+
+        <View className="bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 flex-row items-start">
+          <Text className="text-zinc-500 mr-2">ℹ</Text>
+          <Text className="text-zinc-500 text-xs flex-1">
+            FitVision provides general guidance only and is not a replacement
+            for professional coaching advice. If you have a pre-existing injury
+            or health condition, consult a qualified professional before use.
+          </Text>
+        </View>
       </View>
     </View>
   );

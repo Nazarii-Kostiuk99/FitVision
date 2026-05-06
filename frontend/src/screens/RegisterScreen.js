@@ -1,32 +1,17 @@
 import React, { useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, Alert } from "react-native";
-import * as SecureStore from "expo-secure-store";
-import BASE_URL from "../api/client";
 
 export default function RegisterScreen({ navigation }) {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  async function handleRegister() {
-    try {
-      const response = await fetch(`${BASE_URL}/auth/register/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, email, password }),
-      });
-
-      const data = await response.json();
-
-      if (data.access) {
-        await SecureStore.setItemAsync("access_token", data.access);
-        navigation.replace("Home");
-      } else {
-        Alert.alert("Register failed", JSON.stringify(data));
-      }
-    } catch (error) {
-      Alert.alert("Error", error.message);
+  function handleRegister() {
+    if (!username || !email || !password) {
+      Alert.alert("Please fill in all fields");
+      return;
     }
+    navigation.navigate("Terms", { username, email, password });
   }
 
   return (

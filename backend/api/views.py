@@ -156,10 +156,11 @@ class AnalyseView(APIView):
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
-# returns a single analysis that belong to logged in user by id
+# returns or deletes a single analysis that belong to logged in user by id
 class AnalysisDetailView(APIView):
     """
-    GET /api/analysis/<id>/
+    GET    /api/analysis/<id>/
+    DELETE /api/analysis/<id>/
     """
 
     def get(self, request, pk):
@@ -172,6 +173,22 @@ class AnalysisDetailView(APIView):
 
         serializer = AnalysisSerializer(analysis, context={"request": request})
         return Response(serializer.data)
+
+    def delete(self, request, pk):
+        try:
+            analysis = Analysis.objects.get(pk=pk, user=request.user)
+        except Analysis.DoesNotExist:
+            return Response(
+                {"error": "Analysis not found."}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        if analysis.output_video:
+            path = os.path.join(settings.MEDIA_ROOT, str(analysis.output_video))
+            if os.path.exists(path):
+                os.remove(path)
+
+        analysis.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 # return all
@@ -187,3 +204,20 @@ class AnalysisListView(APIView):
             analyses, many=True, context={"request": request}
         )
         return Response(serializer.data)
+
+
+class DeleteAccountView(APIView):
+    """
+    DELETE /api/auth/account/
+    Deletes all output videos from disk then removes the user account.
+    """
+
+    def delete(self, request):
+        user = request.user
+        for analysis in Analysis.objects.filter(user=user):
+            if analysis.output_video:
+                path = os.path.join(settings.MEDIA_ROOT, str(analysis.output_video))
+                if os.path.exists(path):
+                    os.remove(path)
+        user.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

@@ -7,6 +7,7 @@ from .views import (
     AnalysisListView,
     RegisterView,
     MeView,
+    DeleteAccountView,
 )
 
 urlpatterns = [
@@ -15,6 +16,7 @@ urlpatterns = [
     path("auth/login/", TokenObtainPairView.as_view()),
     path("auth/refresh/", TokenRefreshView.as_view()),
     path("auth/me/", MeView.as_view()),
+    path("auth/account/", DeleteAccountView.as_view()),
     # exercise analysis
     # /api
     path("analyse/", AnalyseView.as_view()),

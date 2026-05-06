@@ -1,6 +1,6 @@
 import * as SecureStore from "expo-secure-store";
 
-// change this to your machine's IP when testing on a real device
+// my mac IP for demo vid
 const BASE_URL = "http://10.136.8.6:8000/api";
 
 export default BASE_URL;

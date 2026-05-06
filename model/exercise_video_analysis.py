@@ -69,6 +69,7 @@ def analyse_video(video_path, exercise_type, output_dir="outputs", analysis_id=N
     state = "up"
     prev_reps = 0
     worst_fault = "None"
+    rep_faults = []
 
     if exercise_type == "squat":
         rep_data = get_initial_squat_rep_data()
@@ -251,13 +252,14 @@ def analyse_video(video_path, exercise_type, output_dir="outputs", analysis_id=N
 
                 # reset worst fault on new rep
                 if reps != prev_reps:
+                    rep_faults.append((reps, worst_fault))
                     worst_fault = "None"
                     prev_reps = reps
 
                 if state == "down":
                     if heel_lifted_current:
                         worst_fault = "Heels lifting"
-                    elif lean_angle >= 75 and worst_fault not in ["Heels lifting"]:
+                    elif lean_angle >= 65 and worst_fault not in ["Heels lifting"]:
                         worst_fault = "Too much lean"
                     elif lean_angle >= 45 and worst_fault == "None":
                         worst_fault = "Forward lean"
@@ -297,11 +299,6 @@ def analyse_video(video_path, exercise_type, output_dir="outputs", analysis_id=N
                         "Lifted" if heel_lifted_current else "Grounded",
                         BAD if heel_lifted_current else GOOD,
                     ),
-                    (
-                        "Worst fault of rep",
-                        worst_fault,
-                        fault_colour,
-                    ),
                 ]
 
             if exercise_type == "pushup":
@@ -338,6 +335,7 @@ def analyse_video(video_path, exercise_type, output_dir="outputs", analysis_id=N
                 GOLD = (50, 200, 220)
 
                 if reps != prev_reps:
+                    rep_faults.append((reps, worst_fault))
                     worst_fault = "None"
                     prev_reps = reps
 
@@ -348,15 +346,18 @@ def analyse_video(video_path, exercise_type, output_dir="outputs", analysis_id=N
                         worst_fault = "Too far forward"
                     elif body_angle < 158 and worst_fault == "None":
                         worst_fault = "Body not straight"
-                    elif angle > 95 and worst_fault == "None":
-                        worst_fault = "Shallow depth"
+                    elif rep_data["min_elbow_angle"] > 95:
+                        if worst_fault == "None":
+                            worst_fault = "Shallow depth"
+                    elif worst_fault == "Shallow depth":
+                        worst_fault = "None"
 
                 # elbow depth as category
                 if angle < 80:
                     depth_cat = "Excellent"
                 elif angle <= 95:
                     depth_cat = "Good"
-                elif angle <= 120:
+                elif angle <= 140:
                     depth_cat = "Shallow"
                 else:
                     depth_cat = "Too shallow"
@@ -383,11 +384,6 @@ def analyse_video(video_path, exercise_type, output_dir="outputs", analysis_id=N
                         "Shoulder Shift",
                         f"{shoulder_offset_current:.2f}",
                         GOOD if shoulder_offset_current < 0.25 else WARN,
-                    ),
-                    (
-                        "Worst fault of rep",
-                        worst_fault,
-                        fault_colour,
                     ),
                 ]
 
@@ -494,6 +490,7 @@ def analyse_video(video_path, exercise_type, output_dir="outputs", analysis_id=N
                 GOLD = (50, 200, 220)
 
                 if reps != prev_reps:
+                    rep_faults.append((reps, worst_fault))
                     worst_fault = "None"
                     prev_reps = reps
 
@@ -562,11 +559,6 @@ def analyse_video(video_path, exercise_type, output_dir="outputs", analysis_id=N
                         "Knee Angle",
                         f"{int(knee_angle_cur)} deg",
                         WHITE,
-                    ),
-                    (
-                        "Worst fault of rep",
-                        worst_fault,
-                        fault_colour,
                     ),
                 ]
 
@@ -671,6 +663,35 @@ def analyse_video(video_path, exercise_type, output_dir="outputs", analysis_id=N
             for i, (label, value, val_color) in enumerate(metrics):
                 row_y = py1 + pad + i * row_h
                 draw_metric(frame, px1 + 14, row_y + 14, label, value, val_color)
+
+            # ── per-rep fault summary panel (right side) ─────────────────
+            if rep_faults:
+                rp_w = 420
+                rp_row_h = 52
+                rp_pad = 14
+                rp_x1 = width - rp_w - 10
+                rp_y1 = 10
+                rp_h = rp_pad + 38 + len(rep_faults) * rp_row_h + rp_pad
+                draw_panel(frame, rp_x1, rp_y1, rp_x1 + rp_w, rp_y1 + rp_h)
+                cv2.putText(
+                    frame, "Rep Summary",
+                    (rp_x1 + 14, rp_y1 + 34),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.85, WHITE, 2, cv2.LINE_AA,
+                )
+                for i, (rep_num, fault) in enumerate(rep_faults):
+                    ry = rp_y1 + rp_pad + 38 + i * rp_row_h
+                    colour = GOOD if fault == "None" else BAD
+                    fault_text = "Good form" if fault == "None" else fault
+                    cv2.putText(
+                        frame, f"Rep {rep_num}:",
+                        (rp_x1 + 14, ry + 28),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.75, (200, 200, 200), 1, cv2.LINE_AA,
+                    )
+                    cv2.putText(
+                        frame, fault_text,
+                        (rp_x1 + 130, ry + 28),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.75, colour, 2, cv2.LINE_AA,
+                    )
 
             # ── joint angle labels ────────────────────────────────────────
             for _name, (ang, coord) in angles.items():

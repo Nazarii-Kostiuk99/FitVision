@@ -74,6 +74,8 @@ def rep_score(depth_result, thigh_result, posture_result, heels_result, knee_rom
     # Posture
     if posture_result == "Slight forward lean":
         score -= 10
+    elif posture_result == "Forward lean":
+        score -= 15
     elif posture_result == "Too much forward lean":
         score -= 25
 
@@ -285,7 +287,7 @@ def analyse_squat(landmarks, mp_pose, reps, state, rep_data, rep_feedback_blocks
             posture_result = "Great upright posture"
         elif rep_lean < 60:
             posture_result = "Slight forward lean"
-        elif rep_lean < 75:
+        elif rep_lean < 65:
             posture_result = "Forward lean"
         else:
             posture_result = "Too much forward lean"
@@ -339,7 +341,7 @@ def analyse_squat(landmarks, mp_pose, reps, state, rep_data, rep_feedback_blocks
         worst_lean = (
             max(rep_data["lean_angles"]) if rep_data["lean_angles"] else lean_angle
         )
-        if worst_lean >= 75:
+        if worst_lean >= 65:
             primary_feedback = "Too much forward lean"
             colour = (60, 60, 220)
         elif worst_lean >= 60:

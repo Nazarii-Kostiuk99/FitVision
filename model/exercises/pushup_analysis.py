@@ -149,10 +149,11 @@ def analyse_pushup(
         rep_data["body_angles"].append(body_angle)
         rep_data["hip_positions"].append(hip.y)
         rep_data["shoulder_offsets"].append(shoulder_offset_norm)
-        rep_data["neck_angles"].append(neck_angle)
+        if ear.visibility > 0.3 and 160 < body_angle < 200:
+            rep_data["neck_angles"].append(neck_angle)
 
         # mark valid only once we reach meaningful depth
-        if elbow_angle < 120:
+        if elbow_angle < 140:
             rep_data["valid"] = True
 
     ################################ SAFE CURRENT FRAME STATS FOR DEBUG ###############################
@@ -189,7 +190,6 @@ def analyse_pushup(
 
             # |------------------ core (hip sag/pike) ------------------|
 
-        
             avg_hip_y = statistics.mean(rep_data["hip_positions"])
 
             hip_drop = rep_data["max_hip_y"] - rep_data["hip_y_start"]  # positive = sag
@@ -234,12 +234,15 @@ def analyse_pushup(
                 score -= 20
 
             # ------------------ neck  ------------------
-            avg_neck = float(np.mean(rep_data["neck_angles"])) if rep_data["neck_angles"] else neck_angle
-            if 115 <= avg_neck <= 155:
-                neck_result = "Neutral"
+            if rep_data["neck_angles"]:
+                avg_neck = float(np.mean(rep_data["neck_angles"]))
+                if 115 <= avg_neck <= 155:
+                    neck_result = "Neutral"
+                else:
+                    neck_result = "Misaligned"
+                    score -= 8
             else:
-                neck_result = "Misaligned"
-                score -= 8
+                neck_result = "Not detected"
 
             # ------------------ tempo ------------------
             rep_time = (
