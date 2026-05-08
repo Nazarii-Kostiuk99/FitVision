@@ -27,7 +27,7 @@ SPINE_CONFIDENCE_THRESHOLD = 0.3
 LANDMARK_VISIBILITY_THRESHOLD = 0.5
 
 
-EMA_ALPHA = 0.3  # smoothing factor, bigger = more jitter but responsive
+EMA_ALPHA = 0.4  # smoothing factor, bigger -> more jitter but responsive
 
 
 # per-rep tracking data ->  Reset after every completed rep
@@ -85,13 +85,13 @@ def detect_side(landmarks, mp_pose):
 # 0.0 = perfectly straight, larger values = more curved
 def compute_spine_curvature(spine_points):
     """
-    For every intermediate point, compute its perpendicular distance to that line using the 2-D cross-product formula:
+    For every point -> compute its perpendicular distance to that line using cross prod
       distance = |AB × AP| / |AB|
-      where AB = sacrum - T3, AP = point - T3 (most top).
+      where AB = sacrum - T3, AP = point - T3 (most top)
 
-       MEAN distance across all  vertebras.
+       MEAN distance across all  vertebras
 
-      Normalised by dividing by spine length so the result is scale-independent.
+      Normalised by dividing by spine length(for independent result)
     """
     pts = np.array(spine_points, dtype=float)
     top = pts[0]  # T3
@@ -106,7 +106,7 @@ def compute_spine_curvature(spine_points):
     deviations = []
     for pt in pts[1:-1]:  # intermediate vertebras only
         ap = pt - top  # AP
-        # 2-D cross product magnitude = |AB_x * AP_y  -  AB_y * AP_x|
+
         cross = abs(spine_vec[0] * ap[1] - spine_vec[1] * ap[0])
         deviations.append(cross / spine_len)
 
@@ -115,14 +115,10 @@ def compute_spine_curvature(spine_points):
 
 
 def _extract_spine_points(spine_keypoints, spine_scores, frame_width, frame_height):
-    """
-    spinepose gives pixel coords + normalise to [0,1] to match mediapipe space.
-    None if any point is < confidence threshold (skip bad frames)
-    """
     points = []
     for idx in SPINE_IDS:
         if spine_scores[idx] < SPINE_CONFIDENCE_THRESHOLD:
-            return None  # drop the whole frame if any point is uncertain
+            return None  # drop the whole frame if point low confidence
         x_norm = spine_keypoints[idx][0] / frame_width
         y_norm = spine_keypoints[idx][1] / frame_height
         points.append([x_norm, y_norm])
@@ -135,8 +131,8 @@ def _extract_spine_points(spine_keypoints, spine_scores, frame_width, frame_heig
 def analyse_deadlift(
     landmarks,
     mp_pose,
-    spine_keypoints,  # np.ndarray shape (37, 2) coords or None
-    spine_scores,  # np.ndarray shape (37,)  confidence   or None
+    spine_keypoints,  # np.ndarray  (37, 2) coords or None
+    spine_scores,  # np.ndarray  (37,)  confidence   or None
     frame_width,
     frame_height,
     reps,
@@ -146,10 +142,8 @@ def analyse_deadlift(
     video_timestamp=0.0,  # sec
 ):
     """
-   
-
     MediaPipe = state machine, bar-path tracking, knee-lockout check, time.
-    SpinePose = spine curvature metric. 
+    SpinePose = spine curvature metric.
     """
 
     # settings side after detection
@@ -173,13 +167,13 @@ def analyse_deadlift(
         wrist = landmarks[mp_pose.PoseLandmark.RIGHT_WRIST.value]
         side_label = "Right"
 
-    # ── visibility  ─────────────────────────────────────────────────────────
+    ###################### visibility  ######################
     landmarks_reliable = all(
         lm.visibility >= LANDMARK_VISIBILITY_THRESHOLD
         for lm in [shoulder, hip, knee, ankle]
     )
 
-    # ── EMA smoothing ──────────────────────────────────────────────────────────
+    # ###################### EMA smoothing ######################
     # Only smoothes reliable frames
     def _ema(prev, new_val):
         if prev is None:
@@ -195,7 +189,7 @@ def analyse_deadlift(
         rep_data["smooth_ankle"] = _ema(rep_data["smooth_ankle"], [ankle.x, ankle.y])
         rep_data["smooth_wrist"] = _ema(rep_data["smooth_wrist"], [wrist.x, wrist.y])
     elif rep_data["smooth_shoulder"] is None:
-        # First frame is unreliable — seed with raw values so coords are never None
+        # if 1st frame  unreliable ->  raw values so coords are never None
         rep_data["smooth_shoulder"] = [shoulder.x, shoulder.y]
         rep_data["smooth_hip"] = [hip.x, hip.y]
         rep_data["smooth_knee"] = [knee.x, knee.y]
@@ -248,7 +242,7 @@ def analyse_deadlift(
                 rep_data["rep_start_time"] = video_timestamp
             state = "down"
 
-    ################################ TRACKING (only down state) ###############################
+    ################################ TRACKING  ###############################
 
     if state == "down" and landmarks_reliable:
         rep_data["min_hip_angle"] = min(rep_data["min_hip_angle"], hip_angle)
@@ -306,14 +300,14 @@ def analyse_deadlift(
             if rep_data["spine_curvatures"]:
                 mean_curv = float(np.mean(rep_data["spine_curvatures"]))
 
-                if mean_curv < 0.03:
+                if mean_curv < 0.015:
                     spine_result = "Neutral spine"
-                elif mean_curv < 0.25:
+                elif mean_curv < 0.02:
                     spine_result = "Slight rounding"
-                    score -= 15
+                    score -= 30
                 else:
                     spine_result = "Significant rounding"
-                    score -= 30
+                    score -= 50
             else:
                 spine_result = "Not detected"
 
@@ -324,18 +318,18 @@ def analyse_deadlift(
                 (max(wx) - min(wx)) / torso_length if wx and torso_length > 0 else 0
             )
 
-            if bar_drift < 0.10:
+            if bar_drift < 0.30:
                 bar_result = "Bar stayed close"
-            elif bar_drift < 0.20:
+            elif bar_drift < 0.40:
                 bar_result = "Slight bar drift"
-                score -= 10
+                score -= 15
             else:
                 bar_result = "Bar drifted away"
-                score -= 20
+                score -= 30
 
             # ------------------ knee lockout ------------------
             knee_top = rep_data["knee_angle_at_top"]
-            if knee_top is not None and knee_top > 155:
+            if knee_top is not None and knee_top > 160:
                 lockout_result = "Locked out"
             else:
                 lockout_result = "Not fully locked"
@@ -347,7 +341,7 @@ def analyse_deadlift(
                 if rep_data["rep_start_time"]
                 else 0
             )
-            if rep_time < 1.0:
+            if rep_time < 1.5:
                 tempo_result = "Too fast"
                 score -= 12
             elif rep_time > 5.0:
@@ -418,7 +412,7 @@ def analyse_deadlift(
         elif cur_spine_curv is not None and cur_spine_curv >= 0.05:
             live_feedback = "Slight rounding - brace core"
             live_colour = (0, 165, 255)
-        elif cur_bar_drift >= 0.20:
+        elif cur_bar_drift >= 0.40:
             live_feedback = "Bar drifting away"
             live_colour = (0, 165, 255)
         else:

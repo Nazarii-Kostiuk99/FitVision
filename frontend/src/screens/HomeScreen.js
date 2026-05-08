@@ -7,6 +7,7 @@ import {
   Animated,
   useWindowDimensions,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 import * as SecureStore from "expo-secure-store";
 import BASE_URL from "../api/client";
@@ -62,6 +63,7 @@ function ProgressBar({ progress }) {
 }
 
 export default function HomeScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   const [videoUri, setVideoUri] = useState(null);
   const [exercise, setExercise] = useState("squat");
   const [loading, setLoading] = useState(false);
@@ -167,13 +169,18 @@ export default function HomeScreen({ navigation }) {
   }
 
   return (
-    <View className="flex-1 bg-black px-6">
-      <View className="absolute top-32 left-0 right-0 items-center">
-        <Text className="text-turquoise text-6xl font-bold">FitVision</Text>
-        <Text className="text-zinc-400 mt-1 text-xl">Analyse your form</Text>
-      </View>
-
+    <View
+      className="flex-1 bg-black px-6"
+      style={{ paddingTop: insets.top, paddingBottom: insets.bottom + 16 }}
+    >
       <View className="flex-1 justify-center">
+        <Text className="text-turquoise text-6xl font-bold text-center">
+          FitVision
+        </Text>
+        <Text className="text-zinc-400 mt-1 text-xl text-center mb-12">
+          Analyse your form
+        </Text>
+
         <Text className="text-white font-semibold mb-3">Select Exercise</Text>
         <View className="flex-row gap-3 mb-8">
           {EXERCISES.map((ex) => (
@@ -195,15 +202,6 @@ export default function HomeScreen({ navigation }) {
               </Text>
             </TouchableOpacity>
           ))}
-        </View>
-
-        <View className="bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 mb-3 flex-row items-start">
-          <Text className="text-yellow-400 mr-2">⚠</Text>
-          <Text className="text-zinc-400 text-xs flex-1">
-            Position yourself approximately 90° to the camera at a distance
-            of 1.5–2 m, ensuring your full body is in frame. For best results,
-            record in a clear space with as few people around as possible.
-          </Text>
         </View>
 
         <TouchableOpacity
@@ -231,15 +229,23 @@ export default function HomeScreen({ navigation }) {
         >
           <Text className="text-zinc-400">View History</Text>
         </TouchableOpacity>
+      </View>
 
-        <View className="bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 flex-row items-start">
-          <Text className="text-zinc-500 mr-2">ℹ</Text>
-          <Text className="text-zinc-500 text-xs flex-1">
-            FitVision provides general guidance only and is not a replacement
-            for professional coaching advice. If you have a pre-existing injury
-            or health condition, consult a qualified professional before use.
-          </Text>
-        </View>
+      <View className="bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 mb-3 flex-row items-center">
+        <Text className="text-yellow-400 mr-2 text-sm">⚠</Text>
+        <Text className="text-zinc-400 text-xs flex-1">
+          Position yourself approximately 90° to the camera at a distance of
+          1.5–2 m, ensuring your full body is in frame. For best results, record
+          in a clear space with as few people around as possible.
+        </Text>
+      </View>
+      <View className="bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 flex-row items-center">
+        <Text className="text-zinc-500 mr-2 text-sm">ℹ</Text>
+        <Text className="text-zinc-500 text-xs flex-1">
+          FitVision provides general guidance only and is not a replacement for
+          professional coaching advice. If you have a pre-existing injury or
+          health condition, consult a qualified professional before use.
+        </Text>
       </View>
     </View>
   );

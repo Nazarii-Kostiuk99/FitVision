@@ -47,7 +47,7 @@ def analyse_video(video_path, exercise_type, output_dir="outputs", analysis_id=N
     Returns a dict with rep_feedback, llm_summary, total_reps, output_video_path
     """
 
-    if exercise_type not in ["squat", "pushup", "deadlift", "lunge", "plank"]:
+    if exercise_type not in ["squat", "pushup", "deadlift"]:
         print(f"Exercise '{exercise_type}' not supported yet")
         return None
 
@@ -70,6 +70,7 @@ def analyse_video(video_path, exercise_type, output_dir="outputs", analysis_id=N
     prev_reps = 0
     worst_fault = "None"
     rep_faults = []
+    prev_dl_state = "up"
 
     if exercise_type == "squat":
         rep_data = get_initial_squat_rep_data()
@@ -80,7 +81,7 @@ def analyse_video(video_path, exercise_type, output_dir="outputs", analysis_id=N
     else:
         rep_data = {}
 
-    # create spinepose estimator once, only used for deadlift
+    # create spinepose estimator, only used for deadlift
     spine_estimator = None
     if exercise_type == "deadlift" and SPINEPOSE_AVAILABLE:
         spine_estimator = SpinePoseEstimator(device=TORCH_DEVICE)
@@ -263,6 +264,8 @@ def analyse_video(video_path, exercise_type, output_dir="outputs", analysis_id=N
                         worst_fault = "Too much lean"
                     elif lean_angle >= 45 and worst_fault == "None":
                         worst_fault = "Forward lean"
+                    elif depth_ratio > 1.2 and worst_fault == "None":
+                        worst_fault = "Too deep"
                     elif depth_ratio < 0.6 and angle < 100 and worst_fault == "None":
                         worst_fault = "Too shallow"
 
@@ -351,6 +354,10 @@ def analyse_video(video_path, exercise_type, output_dir="outputs", analysis_id=N
                             worst_fault = "Shallow depth"
                     elif worst_fault == "Shallow depth":
                         worst_fault = "None"
+                    elif (neck_angle is not None and neck_angle > 0
+                          and (neck_angle < 115 or neck_angle > 155)
+                          and worst_fault == "None"):
+                        worst_fault = "Neck misaligned"
 
                 # elbow depth as category
                 if angle < 80:
@@ -424,9 +431,9 @@ def analyse_video(video_path, exercise_type, output_dir="outputs", analysis_id=N
                     and spine_scores is not None
                     and state == "down"
                 ):
-                    if cur_spine_curv < 0.03:
+                    if cur_spine_curv < 0.015:
                         spine_colour = (0, 255, 0)  # green — neutral
-                    elif cur_spine_curv < 0.25:
+                    elif cur_spine_curv < 0.020:
                         spine_colour = (0, 165, 255)  # orange — slight rounding
                     else:
                         spine_colour = (0, 0, 255)  # red — excessive rounding
@@ -489,6 +496,11 @@ def analyse_video(video_path, exercise_type, output_dir="outputs", analysis_id=N
                 WHITE = (240, 240, 240)
                 GOLD = (50, 200, 220)
 
+                if prev_dl_state == "down" and state == "up":
+                    if knee_angle_cur is not None and knee_angle_cur < 155 and worst_fault == "None":
+                        worst_fault = "Knees not locked"
+                prev_dl_state = state
+
                 if reps != prev_reps:
                     rep_faults.append((reps, worst_fault))
                     worst_fault = "None"
@@ -497,29 +509,31 @@ def analyse_video(video_path, exercise_type, output_dir="outputs", analysis_id=N
                 if state == "down":
                     if (
                         cur_spine_curv is not None
-                        and cur_spine_curv >= 0.10
+                        and cur_spine_curv >= 0.020
                         and worst_fault not in ["Spine rounding"]
                     ):
                         worst_fault = "Spine rounding"
                     elif (
                         cur_spine_curv is not None
-                        and cur_spine_curv >= 0.05
+                        and cur_spine_curv >= 0.015
                         and worst_fault == "None"
                     ):
                         worst_fault = "Slight rounding"
-                    elif cur_bar_drift >= 0.20 and worst_fault == "None":
+                    elif cur_bar_drift >= 0.40 and worst_fault == "None":
                         worst_fault = "Bar drifting"
-                    elif angle > 85 and worst_fault == "None":
+                    elif cur_min_hip > 85 and cur_min_hip < 999 and worst_fault == "None":
                         worst_fault = "Not deep enough"
+                    elif cur_min_hip <= 85 and worst_fault == "Not deep enough":
+                        worst_fault = "None"
 
                 # spine curve as category
                 if cur_spine_curv is None:
                     spine_cat = "Not detected"
                     spine_colour = WHITE
-                elif cur_spine_curv < 0.05:
+                elif cur_spine_curv < 0.015:
                     spine_cat = "Neutral"
                     spine_colour = GOOD
-                elif cur_spine_curv < 0.10:
+                elif cur_spine_curv < 0.020:
                     spine_cat = "Slight rounding"
                     spine_colour = WARN
                 else:
@@ -527,10 +541,10 @@ def analyse_video(video_path, exercise_type, output_dir="outputs", analysis_id=N
                     spine_colour = BAD
 
                 # bar drift as category
-                if cur_bar_drift < 0.10:
+                if cur_bar_drift < 0.30:
                     bar_cat = "Close"
                     bar_colour = GOOD
-                elif cur_bar_drift < 0.20:
+                elif cur_bar_drift < 0.40:
                     bar_cat = "Slight drift"
                     bar_colour = WARN
                 else:
@@ -674,23 +688,38 @@ def analyse_video(video_path, exercise_type, output_dir="outputs", analysis_id=N
                 rp_h = rp_pad + 38 + len(rep_faults) * rp_row_h + rp_pad
                 draw_panel(frame, rp_x1, rp_y1, rp_x1 + rp_w, rp_y1 + rp_h)
                 cv2.putText(
-                    frame, "Rep Summary",
+                    frame,
+                    "Rep Summary",
                     (rp_x1 + 14, rp_y1 + 34),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.85, WHITE, 2, cv2.LINE_AA,
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.85,
+                    WHITE,
+                    2,
+                    cv2.LINE_AA,
                 )
                 for i, (rep_num, fault) in enumerate(rep_faults):
                     ry = rp_y1 + rp_pad + 38 + i * rp_row_h
                     colour = GOOD if fault == "None" else BAD
                     fault_text = "Good form" if fault == "None" else fault
                     cv2.putText(
-                        frame, f"Rep {rep_num}:",
+                        frame,
+                        f"Rep {rep_num}:",
                         (rp_x1 + 14, ry + 28),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.75, (200, 200, 200), 1, cv2.LINE_AA,
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.75,
+                        (200, 200, 200),
+                        1,
+                        cv2.LINE_AA,
                     )
                     cv2.putText(
-                        frame, fault_text,
+                        frame,
+                        fault_text,
                         (rp_x1 + 130, ry + 28),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.75, colour, 2, cv2.LINE_AA,
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.75,
+                        colour,
+                        2,
+                        cv2.LINE_AA,
                     )
 
             # ── joint angle labels ────────────────────────────────────────
